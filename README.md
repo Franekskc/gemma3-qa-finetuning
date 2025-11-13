@@ -3,7 +3,7 @@ Experiments comparing **Full FT**, **LoRA (PEFT)**, and **Layer Freezing** for *
 
 
 ## Dependencies installation:
-```bash
-pip install uv
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 uv sync
 ```
