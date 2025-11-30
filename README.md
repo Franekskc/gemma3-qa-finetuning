@@ -35,7 +35,7 @@ Get your API key from:
 Then copy the example environment file and add your key:
 
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 Open `.env` and set:
@@ -49,11 +49,15 @@ OPENAI_API_KEY=your_api_key_here
 ### 2. 📦 Install Dependencies
 
 This project uses **uv** for fast Python package management.
-Install the required packages:
+If not yet installed, install the required packages:
 
 ```bash
-uv install
+uv sync
 ```
+
+
+> Note: if you are using Windows you need to install `Microsoft Visual C++ Redistributable` and `CUDA Runtime` - https://developer.nvidia.com/cuda-downloads
+
 
 ---
 

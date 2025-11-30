@@ -13,7 +13,7 @@ def create_database_instance(embeddings_model: Embeddings, langchain_documents: 
     return vector_store
 
 
-def crate_rag_agent(retriever):
+def create_rag_agent(retriever):
     retriever_tool = get_retriever_tool(retriever)
     agent = create_agent(model="openai:gpt-4o-mini", system_prompt="You are an assistant for question-answering tasks. You MUST use the 'retriever' tool to find context for EVERY user question. DO NOT answer any question from your own internal knowledge. If the retriever finds no relevant information, just say 'I do not have that information.'", tools=[retriever_tool])
     return agent
