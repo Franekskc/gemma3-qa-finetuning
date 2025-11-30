@@ -39,5 +39,7 @@ torch = [
 where = ["src"]
 
 [project.scripts]
-gemmaqa-train = "gemmaqa.train:main"
-gemmaqa-eval  = "gemmaqa.eval:main"
+gemmaqa-train = "gemmaqa.finetuning.train:main"
+gemmaqa-eval  = "gemmaqa.inference.eval:main"
+gemmaqa-chat  = "gemmaqa.inference.chat:main"
+gemmaqa-check-cuda = "gemmaqa.utils.cuda_check:main"
