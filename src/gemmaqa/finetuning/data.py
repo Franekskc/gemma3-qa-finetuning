@@ -11,15 +11,19 @@ def format_squad_example(example):
     text = f"Context: {context}\n\nQuestion: {question}\n\nAnswer: {answer}"
     return {"text": text}
 
-def load_and_process_data(tokenizer, num_samples=100):
+def load_and_process_data(tokenizer, data_path=None, num_samples=None):
     """
-    Loads SQuAD dataset, selects a subset, and formats it for training.
+    Loads SQuAD dataset (from HF or local JSON), selects a subset, and formats it for training.
     """
     # Load dataset
-    dataset = load_dataset("squad", split="train")
+    if data_path:
+        dataset = load_dataset("json", data_files=data_path, split="train")
+    else:
+        dataset = load_dataset("squad", split="train")
     
-    # Select subset
-    dataset = dataset.select(range(min(num_samples, len(dataset))))
+    # Select subset if num_samples is specified
+    if num_samples is not None:
+        dataset = dataset.select(range(min(num_samples, len(dataset))))
     
     # Format data
     dataset = dataset.map(format_squad_example)
@@ -29,9 +33,7 @@ def load_and_process_data(tokenizer, num_samples=100):
         return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=512)
     
     tokenized_datasets = dataset.map(tokenize_function, batched=True)
-    
-    # We need 'labels' for Trainer to compute loss. 
-    # For Causal LM, labels are usually the same as input_ids.
+
     def add_labels(examples):
         examples["labels"] = examples["input_ids"].copy()
         return examples

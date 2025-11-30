@@ -4,47 +4,60 @@ Experiments comparing **Full FT**, **LoRA (PEFT)**, and **Layer Freezing** for *
 
 ## Project Structure
 
-The project is organized as follows:
-
 - `src/gemmaqa/finetuning/`: Scripts for training and data processing.
 - `src/gemmaqa/inference/`: Scripts for inference and evaluation.
 - `src/gemmaqa/utils/`: Utility scripts (e.g., CUDA check).
 - `gemma-lora-squad-final/`: Directory containing the fine-tuned LoRA adapter.
 
-## Installation
+## Step-by-Step Tutorial
 
-1. Install `uv` (if not already installed):
-   ```powershell
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
+### 1. Install Dependencies
+This project uses `uv` for dependency management.
 
-2. Sync dependencies:
-   ```powershell
-   uv sync
-   ```
+1.  **Install `uv`** (if not already installed):
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    ```
 
-## Usage
+2.  **Sync Dependencies**:
+    ```powershell
+    uv sync
+    ```
 
-### Check CUDA Availability
-Ensure your GPU is detected:
+### 2. Test CUDA
+Ensure your GPU is detected and PyTorch is using it.
 ```powershell
 uv run gemmaqa-check-cuda
 ```
+*Expected Output:* `CUDA available: True`, `Device name: NVIDIA GeForce ...`
 
-### Training
-To fine-tune the model:
+### 3. Generate Datasets
+Split the SQuAD dataset into a training subset (4k examples), a test subset (1k examples), and a corpus of all unique contexts.
+```powershell
+uv run gemmaqa-prepare-data
+```
+*Output:* Creates `data/train_subset.json`, `data/test_subset.json`, and `data/corpus.json`.
+
+### 4. Generate LoRA Matrices (Training)
+Fine-tune the Gemma model using LoRA on the generated training subset.
 ```powershell
 uv run gemmaqa-train
 ```
+*Details:*
+- Loads `google/gemma-3-1b-it` in 4-bit quantization.
+- Trains on `data/train_subset.json`.
+- Saves the adapter to `gemma-lora-squad-final`.
 
-### Inference (Chat)
-To run an interactive chat with the fine-tuned model:
+### 5. Run Inference or Evaluation
+
+#### Option A: Interactive Chat
+Chat with the fine-tuned model to test it manually.
 ```powershell
 uv run gemmaqa-chat
 ```
 
-### Evaluation
-To evaluate the model on the SQuAD validation set:
+#### Option B: SQuAD Evaluation
+Evaluate on a random sample of the SQuAD validation set.
 ```powershell
 uv run gemmaqa-eval
 ```

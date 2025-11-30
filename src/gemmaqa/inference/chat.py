@@ -42,7 +42,7 @@ def main():
     input_ids = tokenizer.apply_chat_template(
         messages,
         return_tensors="pt",
-        add_generation_prompt=True  # Tells model: "It is now your turn to answer"
+        add_generation_prompt=True
     ).to("cuda")
 
     print(f"\nPrompt (Formatted): {tokenizer.decode(input_ids[0])}")
