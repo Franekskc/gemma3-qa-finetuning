@@ -33,8 +33,6 @@ def main():
     print(f"Loading LoRA adapter from: {adapter_path}")
     model = PeftModel.from_pretrained(model, adapter_path)
 
-    # --- THE FIX IS HERE ---
-
     # 1. Define the message structure
     messages = [
         {"role": "user", "content": "What is the capital of France?"}
