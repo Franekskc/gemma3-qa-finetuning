@@ -8,7 +8,10 @@ dependencies = [
     "datasets>=4.4.1",
     "evaluate>=0.4.6",
     "peft>=0.18.0",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.7.2",
     "torch>=2.9.1",
+    "torch-optimi>=0.3.2",
     "transformers>=4.57.1",
 ]
 
