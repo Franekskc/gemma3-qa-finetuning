@@ -1,0 +1,49 @@
+# Common configuration
+common:
+  seed: 42
+  model: distilbert-base-uncased
+
+  data:
+    max_train_samples: 1000
+    val_samples: 100
+
+    # Tokenization
+    max_seq_len: 384
+    doc_stride: 128
+  
+  training:
+    output_dir: outputs/model_v1
+    num_train_epochs: 3
+    per_device_train_batch_size: 2
+    effective_batch_size: 8
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    logging_steps: 50
+    early_stopping_patience: 2
+    gradient_checkpointing: True
+    gradient_accumulation_steps: 1
+    save_total_limit: 1
+    fp16: True
+
+# Mode specific configuration
+modes:
+  full:
+    training:
+      learning_rate: 2.0e-5
+      output_dir: outputs/full_finetune
+
+  freeze:
+    training:
+      learning_rate: 2.0e-5
+      output_dir: outputs/layer_freezing
+
+  lora:
+    training:
+      learning_rate: 1.0e-4
+      output_dir: outputs/lora
+
+      adapter:
+        r: 8
+        lora_alpha: 8
+        lora_dropout: 0.05
+        target_modules: [q_proj, k_proj, v_proj, o_proj]

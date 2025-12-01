@@ -1,8 +1,8 @@
+import argparse
 import logging
 import os
 import sys
 from functools import partial
-from typing import Literal
 
 from transformers import (
     EarlyStoppingCallback,
@@ -11,6 +11,7 @@ from transformers import (
     default_data_collator,
 )
 
+from gemmaqa.config import QAConfig
 from gemmaqa.data import load_squad, prepare_train_features, prepare_validation_features
 from gemmaqa.eval import compute_metrics_fn
 from gemmaqa.modeling import prepare_model
@@ -20,24 +21,32 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
+    handlers=[logging.StreamHandler(sys.stdout)],
 )
 
 
-def train(
-    model_name_or_path: str,
-    mode: Literal["full", "freeze", "lora"],
-    learning_rate: float = 0.0,
-    output_dir: str = "outputs",
-    max_train_samples: int = 1000,
-    per_device_train_batch_size: int = 2,
-    effective_batch_size: int = 8,
-    weight_decay: float = 0.01,
-    warmup_ratio: float = 0.1,
-    gradient_accumulation_steps: int = 8,
-    num_train_epochs: int = 5,
-    early_stopping_patience: int = 1,
-):
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Activate QA training in chosen mode.")
+
+    parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=["full", "freeze", "lora"],
+        help="Training mode: full (full fine-tuning), freeze (layer-freezing), lora (LoRA).",
+    )
+
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=r"src\gemmaqa\config.yaml",
+        help="Config file path.",
+    )
+
+    return parser.parse_args()
+
+
+def train(cfg: QAConfig):
     """Train the QA model.
 
     mode:
@@ -46,33 +55,42 @@ def train(
       - `lora`: TODO - LoRA (placeholder)
     """
     set_seed(42)
-    os.makedirs(output_dir, exist_ok=True)
 
-    model, tokenizer = prepare_model(model_name_or_path, mode=mode)
-    logger.info("Loaded model %s", model_name_or_path)
+    t_cfg = cfg.training
+    d_cfg = cfg.data
 
-    # enable gradient checkpointing if available
-    if hasattr(model, "gradient_checkpointing_enable"):
+    os.makedirs(t_cfg.output_dir, exist_ok=True)
+
+    model, tokenizer = prepare_model(cfg.model_name, mode=cfg.mode)
+    logger.info("Loaded model %s", cfg.model_name)
+
+    if t_cfg.gradient_checkpointing:
         try:
             model.gradient_checkpointing_enable()
             logger.info("Enabled gradient checkpointing on model.")
         except Exception as e:
             logger.warning("Could not enable gradient checkpointing: %s", e)
 
-    # Learning rate defaults based on mode
-    if learning_rate == 0.0:
-        learning_rate = 1e-4 if mode.startswith("lora") else 2e-5
-
-    ds = load_squad(max_train_samples, 500)
+    ds = load_squad(d_cfg.max_train_samples, d_cfg.val_samples)
 
     logger.info("Tokenizing training data...")
     train_features = ds["train"].map(
-        partial(prepare_train_features, tokenizer=tokenizer),
+        partial(
+            prepare_train_features,
+            tokenizer=tokenizer,
+            max_length=d_cfg.max_seq_len,
+            doc_stride=d_cfg.doc_stride,
+        ),
         batched=True,
         remove_columns=ds["train"].column_names,
     )
     val_features = ds["validation"].map(
-        partial(prepare_validation_features, tokenizer=tokenizer),
+        partial(
+            prepare_validation_features,
+            tokenizer=tokenizer,
+            max_length=d_cfg.max_seq_len,
+            doc_stride=d_cfg.doc_stride,
+        ),
         batched=True,
         remove_columns=ds["validation"].column_names,
     )
@@ -81,51 +99,53 @@ def train(
         compute_metrics_fn, examples=ds["validation"], features=val_features
     )
 
-    if effective_batch_size > 0:
-        calc_accumulation_steps = effective_batch_size // per_device_train_batch_size
+    if t_cfg.effective_batch_size > 0:
+        calc_accumulation_steps = (
+            t_cfg.effective_batch_size // t_cfg.per_device_train_batch_size
+        )
         gradient_accumulation_steps = max(1, calc_accumulation_steps)
         logger.info(
-            f"Effective batch size set to {effective_batch_size}. "
+            f"Effective batch size set to {t_cfg.effective_batch_size}. "
             f"Calculated gradient accumulation steps: {gradient_accumulation_steps} "
-            f"(per_device={per_device_train_batch_size})"
+            f"(per_device={t_cfg.per_device_train_batch_size})"
         )
 
-    train_batch_size = per_device_train_batch_size
-    
+    train_batch_size = t_cfg.per_device_train_batch_size
+
     total_train_steps = int(
         len(train_features)
         / train_batch_size
         / gradient_accumulation_steps
-        * num_train_epochs
+        * t_cfg.num_train_epochs
     )
     logger.info("Total training steps (approx): %d", total_train_steps)
 
     training_args = TrainingArguments(
-        output_dir=output_dir,
+        output_dir=t_cfg.output_dir,
         eval_strategy="epoch",
         save_strategy="epoch",
-        per_device_train_batch_size=per_device_train_batch_size,
+        per_device_train_batch_size=t_cfg.per_device_train_batch_size,
         optim="stable_adamw",
         gradient_checkpointing=True,
         gradient_accumulation_steps=gradient_accumulation_steps,
-        num_train_epochs=num_train_epochs,
-        learning_rate=learning_rate,
-        weight_decay=weight_decay,
+        num_train_epochs=t_cfg.num_train_epochs,
+        learning_rate=t_cfg.learning_rate,
+        weight_decay=t_cfg.weight_decay,
         fp16=True,
-        logging_steps=20,
-        save_total_limit=1,
+        logging_steps=t_cfg.logging_steps,
+        save_total_limit=t_cfg.save_total_limit,
         remove_unused_columns=True,
         dataloader_pin_memory=True,
         load_best_model_at_end=True,
         metric_for_best_model="eval_f1",
         greater_is_better=True,
-        warmup_ratio=warmup_ratio,
+        warmup_ratio=t_cfg.warmup_ratio,
         lr_scheduler_type="linear",
     )
 
     # Early stopping callback (monitor eval_F1 via compute_metrics_fn)
     early_stop_cb = EarlyStoppingCallback(
-        early_stopping_patience=early_stopping_patience
+        early_stopping_patience=t_cfg.early_stopping_patience
     )
 
     def qa_data_collator(features):
@@ -161,10 +181,15 @@ def train(
     trainer.train()
     logger.info("Training finished. Running evaluation (predict + postprocess)...")
 
-    trainer.save_model(output_dir)
+    trainer.save_model(t_cfg.output_dir)
 
     test_features = ds["test"].map(
-        partial(prepare_validation_features, tokenizer=tokenizer),
+        partial(
+            prepare_validation_features,
+            tokenizer=tokenizer,
+            max_length=d_cfg.max_seq_len,
+            doc_stride=d_cfg.doc_stride,
+        ),
         batched=True,
         remove_columns=ds["test"].column_names,
     )
@@ -173,18 +198,26 @@ def train(
         compute_metrics_fn, examples=ds["test"], features=test_features
     )
     metrics = trainer.evaluate()
-    logger.info(f"Official Test Metrics: {metrics}")
 
     return metrics
 
 
 if __name__ == "__main__":
-    metrics = train(
-        "distilbert-base-uncased",
-        output_dir="out_smoke",
-        mode="full",
-        max_train_samples=10000,
-        num_train_epochs=3,
-        learning_rate=2e-5,
+    args = parse_arguments()
+
+    # Check if file exists
+    if not os.path.exists(args.config):
+        print(f"Error: Config file not found {args.config}")
+        exit(1)
+
+    print(f"--- Starting training in: {args.mode.upper()} mode ---")
+
+    # load configuration
+    config = QAConfig.load(
+        yaml_path=args.config,
+        selected_mode=args.mode,
     )
-    print("Smoke metrics:", metrics)
+
+    metrics = train(config)
+
+    print("Metrics:", metrics)

@@ -55,8 +55,8 @@ def load_squad(train_samples, val_samples) -> DatasetDict:
 def prepare_train_features(
     examples: dict[str, list[str]],
     tokenizer: PreTrainedTokenizerBase,
-    max_length: int = 384,
-    doc_stride: int = 128,
+    max_length: int,
+    doc_stride: int
 ) -> dict[str, Any]:
     """Tokenize examples for training.
 
@@ -138,8 +138,8 @@ def prepare_train_features(
 def prepare_validation_features(
     examples: dict[str, list[str]],
     tokenizer: PreTrainedTokenizerBase,
-    max_length: int = 384,
-    doc_stride: int = 128,
+    max_length: int,
+    doc_stride: int
 ) -> dict[str, Any]:
     """Tokenize examples for validation/prediction.
     
