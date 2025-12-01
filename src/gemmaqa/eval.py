@@ -1,10 +1,11 @@
-import logging
 from collections import defaultdict
 
 import evaluate
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from gemmaqa.utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def compute_metrics_fn(eval_pred, examples, features) -> dict[str, float]:
@@ -25,8 +26,8 @@ def compute_metrics_fn(eval_pred, examples, features) -> dict[str, float]:
             features=features,
             raw_predictions=(start_logits, end_logits),
         )
-    except Exception as exc:
-        logger.exception("compute_metrics_fn failed during evaluation: %s", exc)
+    except Exception as e:
+        logger.exception("compute_metrics_fn failed during evaluation", error=str(e))
         return safe_ret
 
     squad_metric = evaluate.load("squad")

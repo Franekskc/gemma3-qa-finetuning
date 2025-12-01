@@ -2,17 +2,17 @@
 Utilities to load SQuAD and prepare tokenized features for QA.
 """
 
-import logging
 from typing import Any
 
 from datasets import DatasetDict, load_dataset
 from transformers import PreTrainedTokenizerBase
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+from gemmaqa.utils import get_logger
+
+logger = get_logger(__name__)
 
 
-def load_squad(train_samples, val_samples) -> DatasetDict:
+def load_squad(train_samples, val_samples, seed) -> DatasetDict:
     """Load SQuAD dataset and prepare a custom split.
 
     The splitting scheme is as follows:
@@ -21,6 +21,7 @@ def load_squad(train_samples, val_samples) -> DatasetDict:
         (disjoint from the new train set).
     - test: The full official SQuAD validation set.
     """
+    logger.info("Loading SQuAD dataset from Hugging Face Hub")
     raw_ds = load_dataset("squad")
     
     total_samples_needed = train_samples + val_samples
@@ -28,14 +29,16 @@ def load_squad(train_samples, val_samples) -> DatasetDict:
     max_available = len(raw_ds["train"])
     if total_samples_needed > max_available:
         logger.warning(
-            f"Requested {total_samples_needed} samples, but only {max_available} are available. "
-            "Using all available samples."
+            "Requested more samples than available",
+            requested=total_samples_needed,
+            available=max_available,
+            action="Using all available samples"
         )
         total_samples_needed = max_available
 
-    shuffled_subset = raw_ds["train"].shuffle(seed=42).select(range(total_samples_needed))
+    shuffled_subset = raw_ds["train"].shuffle(seed=seed).select(range(total_samples_needed))
 
-    split_ds = shuffled_subset.train_test_split(test_size=val_samples, seed=42)
+    split_ds = shuffled_subset.train_test_split(test_size=val_samples, seed=seed)
 
     final_ds = DatasetDict({
         "train": split_ds["train"],
@@ -44,9 +47,10 @@ def load_squad(train_samples, val_samples) -> DatasetDict:
     })
 
     logger.info(
-        f"Data split created: train={len(final_ds['train'])}, "
-        f"validation={len(final_ds['validation'])} (internal), "
-        f"test={len(final_ds['test'])} (official dev)"
+        "Data split created successfully",
+        train_size=len(final_ds['train']),
+        internal_val_size=len(final_ds['validation']),
+        official_test_size=len(final_ds['test'])
     )
     
     return final_ds

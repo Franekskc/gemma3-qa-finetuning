@@ -4,8 +4,8 @@ common:
   model: distilbert-base-uncased
 
   data:
-    max_train_samples: 1000
-    val_samples: 100
+    max_train_samples: 10000
+    val_samples: 500
 
     # Tokenization
     max_seq_len: 384

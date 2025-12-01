@@ -1,5 +1,4 @@
 import argparse
-import logging
 import os
 import sys
 from functools import partial
@@ -15,14 +14,9 @@ from gemmaqa.config import QAConfig
 from gemmaqa.data import load_squad, prepare_train_features, prepare_validation_features
 from gemmaqa.eval import compute_metrics_fn
 from gemmaqa.modeling import prepare_model
-from gemmaqa.utils import set_seed
+from gemmaqa.utils import get_logger, set_seed
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
+logger = get_logger(__name__)
 
 
 def parse_arguments():
@@ -54,26 +48,30 @@ def train(cfg: QAConfig):
       - `freeze`: TODO - layer freezing (placeholder)
       - `lora`: TODO - LoRA (placeholder)
     """
-    set_seed(42)
+    set_seed(cfg.seed)
 
     t_cfg = cfg.training
     d_cfg = cfg.data
 
     os.makedirs(t_cfg.output_dir, exist_ok=True)
 
-    model, tokenizer = prepare_model(cfg.model_name, mode=cfg.mode)
-    logger.info("Loaded model %s", cfg.model_name)
+    model, tokenizer = prepare_model(cfg.model_name)
+    logger.info("Model loaded", model_name=cfg.model_name, mode=cfg.mode)
 
     if t_cfg.gradient_checkpointing:
         try:
             model.gradient_checkpointing_enable()
-            logger.info("Enabled gradient checkpointing on model.")
+            logger.info("Gradient checkpointing enabled")
         except Exception as e:
-            logger.warning("Could not enable gradient checkpointing: %s", e)
+            logger.warning("Could not enable gradient checkpointing", error=str(e))
 
-    ds = load_squad(d_cfg.max_train_samples, d_cfg.val_samples)
+    ds = load_squad(d_cfg.max_train_samples, d_cfg.val_samples, cfg.seed)
 
-    logger.info("Tokenizing training data...")
+    logger.info(
+        "Tokenizing training data",
+        max_length=d_cfg.max_seq_len,
+        doc_stride=d_cfg.doc_stride,
+    )
     train_features = ds["train"].map(
         partial(
             prepare_train_features,
@@ -105,9 +103,10 @@ def train(cfg: QAConfig):
         )
         gradient_accumulation_steps = max(1, calc_accumulation_steps)
         logger.info(
-            f"Effective batch size set to {t_cfg.effective_batch_size}. "
-            f"Calculated gradient accumulation steps: {gradient_accumulation_steps} "
-            f"(per_device={t_cfg.per_device_train_batch_size})"
+            "Effective batch size configured",
+            target=t_cfg.effective_batch_size,
+            per_device=t_cfg.per_device_train_batch_size,
+            accumulation_steps=gradient_accumulation_steps,
         )
 
     train_batch_size = t_cfg.per_device_train_batch_size
@@ -118,7 +117,9 @@ def train(cfg: QAConfig):
         / gradient_accumulation_steps
         * t_cfg.num_train_epochs
     )
-    logger.info("Total training steps (approx): %d", total_train_steps)
+    logger.info(
+        "Training started", total_steps=total_train_steps, epochs=t_cfg.num_train_epochs
+    )
 
     training_args = TrainingArguments(
         output_dir=t_cfg.output_dir,
@@ -179,10 +180,11 @@ def train(cfg: QAConfig):
     )
 
     trainer.train()
-    logger.info("Training finished. Running evaluation (predict + postprocess)...")
 
+    logger.info("Training finished. Saving model...")
     trainer.save_model(t_cfg.output_dir)
 
+    logger.info("Running final evaluation on Test set")
     test_features = ds["test"].map(
         partial(
             prepare_validation_features,
@@ -207,17 +209,21 @@ if __name__ == "__main__":
 
     # Check if file exists
     if not os.path.exists(args.config):
-        print(f"Error: Config file not found {args.config}")
+        logger.error("Config file not found", path=args.config)
         exit(1)
 
-    print(f"--- Starting training in: {args.mode.upper()} mode ---")
+    logger.info("Starting training session", mode=args.mode, config_path=args.config)
 
     # load configuration
-    config = QAConfig.load(
-        yaml_path=args.config,
-        selected_mode=args.mode,
-    )
+    try:
+        config = QAConfig.load(
+            yaml_path=args.config,
+            selected_mode=args.mode,
+        )
+    except Exception:
+        logger.exception("Failed to load configuration")
+        sys.exit(1)
 
     metrics = train(config)
 
-    print("Metrics:", metrics)
+    logger.info("Process completed", final_metrics=metrics)
