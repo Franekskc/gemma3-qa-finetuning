@@ -1,7 +1,8 @@
 import json
 import os
 import random
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
+
 
 def main():
     # Configuration
@@ -16,7 +17,7 @@ def main():
     print("Loading SQuAD dataset...")
     # Load full training set to split into our Train/Test
     
-    squad_train = load_dataset("squad", split="train")
+    squad_train: Dataset = load_dataset("squad", split="train")
     squad_val = load_dataset("squad", split="validation")
 
     print(f"Original Train size: {len(squad_train)}")
@@ -27,7 +28,7 @@ def main():
     train_indices = list(range(len(squad_train)))
     random.shuffle(train_indices)
     train_subset_indices = train_indices[:train_size]
-    train_subset = squad_train.select(train_subset_indices)
+    train_subset: Dataset = squad_train.select(train_subset_indices)
     
     # 2. Test Subset (1000 from Validation)
     val_indices = list(range(len(squad_val)))

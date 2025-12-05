@@ -5,7 +5,7 @@ Model loading and simple utilities
 
 from transformers import AutoModelForQuestionAnswering, AutoTokenizer
 
-from gemmaqa.utils import get_logger
+from gemmaqa.utils.utils import get_logger
 
 logger = get_logger(__name__)
 

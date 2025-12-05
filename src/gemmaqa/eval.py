@@ -3,7 +3,7 @@ from collections import defaultdict
 import evaluate
 import numpy as np
 
-from gemmaqa.utils import get_logger
+from gemmaqa.utils.utils import get_logger
 
 logger = get_logger(__name__)
 

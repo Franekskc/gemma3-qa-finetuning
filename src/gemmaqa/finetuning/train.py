@@ -1,35 +1,106 @@
-import transformers
+"""
+Main training entry point.
+Supports full finetuning, LoRA, and layer freezing modes via CLI arguments.
+"""
+
+import argparse
+from pathlib import Path
+
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
+
+from gemmaqa.config import QAConfig
+from gemmaqa.utils.utils import configure_logging, set_seed, get_logger
 from .lora import get_lora_model
+from .full import get_full_model
+from .freeze import get_freeze_model
 from .data import load_and_process_data
 
+logger = get_logger(__name__)
+
+# Default config path relative to this file
+DEFAULT_CONFIG = Path(__file__).parent.parent / "config.yaml"
+
+
+def get_model_and_tokenizer(cfg: QAConfig):
+    """Route to the correct model loader based on mode."""
+    if cfg.mode == "lora":
+        return get_lora_model(cfg)
+    elif cfg.mode == "full":
+        return get_full_model(cfg)
+    elif cfg.mode == "freeze":
+        return get_freeze_model(cfg)
+    else:
+        raise ValueError(f"Unknown mode: {cfg.mode}. Must be one of: full, lora, freeze")
+
+
+def build_training_args(cfg: QAConfig) -> TrainingArguments:
+    """Build TrainingArguments from config."""
+    # Calculate gradient accumulation steps
+    grad_accum = cfg.training.effective_batch_size // cfg.training.per_device_train_batch_size
+    
+    return TrainingArguments(
+        output_dir=cfg.training.output_dir,
+        num_train_epochs=cfg.training.num_train_epochs,
+        per_device_train_batch_size=cfg.training.per_device_train_batch_size,
+        gradient_accumulation_steps=grad_accum,
+        learning_rate=cfg.training.learning_rate,
+        weight_decay=cfg.training.weight_decay,
+        warmup_ratio=cfg.training.warmup_ratio,
+        logging_steps=cfg.training.logging_steps,
+        save_strategy="epoch",
+        save_total_limit=cfg.training.save_total_limit,
+        fp16=cfg.training.fp16,
+        report_to="none",
+        # For quick testing, can override with max_steps
+        max_steps=3,  # Short run for verification
+    )
+
+
 def main():
-    model_name = "google/gemma-3-1b-it"
+    parser = argparse.ArgumentParser(description="Train Gemma QA model")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=["full", "lora", "freeze"],
+        help="Training mode: full (full finetuning), lora (LoRA adapters), freeze (layer freezing)"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_CONFIG),
+        help=f"Path to YAML config file (default: {DEFAULT_CONFIG})"
+    )
+    args = parser.parse_args()
+    
+    # Setup logging
+    configure_logging()
+    
+    # Load config
+    logger.info("Loading config", path=args.config, mode=args.mode)
+    cfg = QAConfig.load(args.config, args.mode)
+    
+    # Set seed for reproducibility
+    set_seed(int(cfg.seed))
     
     # Load model and tokenizer
-    print(f"Loading model {model_name}...")
-    model, tokenizer = get_lora_model(model_name)
+    logger.info("Loading model", mode=cfg.mode)
+    model, tokenizer = get_model_and_tokenizer(cfg)
     
     # Load and process data
-    print("Loading data...")
-    # Use the prepared training subset
-    tokenized_datasets = load_and_process_data(tokenizer, data_path="data/train_subset.json")
+    logger.info("Loading data")
+    tokenized_datasets = load_and_process_data(
+        tokenizer,
+        data_path="data/train_subset.json",
+        num_samples=cfg.data.max_train_samples
+    )
     
     # Data collator
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
     
     # Training arguments
-    training_args = TrainingArguments(
-        output_dir="./gemma-lora-squad",
-        per_device_train_batch_size=1, # Small batch size for 4GB GPU
-        gradient_accumulation_steps=4,
-        learning_rate=2e-4,
-        logging_steps=10,
-        max_steps=50, # Short run for verification
-        save_strategy="no",
-        fp16=True, # Use mixed precision
-        report_to="none"
-    )
+    training_args = build_training_args(cfg)
+    logger.info("Training args", output_dir=training_args.output_dir, lr=training_args.learning_rate)
     
     # Trainer
     trainer = Trainer(
@@ -40,13 +111,23 @@ def main():
     )
     
     # Train
-    print("Starting training...")
+    logger.info("Starting training", mode=cfg.mode)
     trainer.train()
     
     # Save model
-    print("Saving model...")
-    model.save_pretrained("./gemma-lora-squad-final")
-    print("Done!")
+    output_path = Path(cfg.training.output_dir) / "final"
+    logger.info("Saving model", path=str(output_path))
+    
+    if cfg.mode == "lora":
+        # Save only the adapter for LoRA
+        model.save_pretrained(str(output_path))
+    else:
+        # Save full model for full/freeze modes
+        trainer.save_model(str(output_path))
+    
+    logger.info("Training complete!")
+
 
 if __name__ == "__main__":
     main()
+
