@@ -1,71 +1,171 @@
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-from peft import PeftModel
+"""
+Interactive chat interface for trained models.
+"""
+
+import argparse
+
+from gemmaqa.inference.model import load_model_for_inference, generate_response
+from gemmaqa.utils import configure_logging, get_logger
+
+logger = get_logger(__name__)
+
+
+def run_chat(
+    model,
+    tokenizer,
+    temperature: float = 0.7,
+    max_new_tokens: int = 50,
+):
+    """
+    Run an interactive chat session.
+    
+    Args:
+        model: Loaded model.
+        tokenizer: Loaded tokenizer.
+        temperature: Generation temperature.
+        max_new_tokens: Maximum new tokens to generate.
+    """
+    print("\n" + "=" * 50)
+    print("Gemma QA Chat Interface")
+    print("Type 'quit' or 'exit' to end the session")
+    print("=" * 50 + "\n")
+    
+    while True:
+        try:
+            user_input = input("You: ").strip()
+            
+            if not user_input:
+                continue
+            
+            if user_input.lower() in ["quit", "exit", "q"]:
+                print("Goodbye!")
+                break
+            
+            response = generate_response(
+                model=model,
+                tokenizer=tokenizer,
+                prompt=user_input,
+                temperature=temperature,
+                max_new_tokens=max_new_tokens,
+            )
+            
+            print(f"Assistant: {response}\n")
+            
+        except KeyboardInterrupt:
+            print("\nGoodbye!")
+            break
+
+
+def run_single_query(
+    model,
+    tokenizer,
+    question: str,
+    context: str | None = None,
+    temperature: float = 0.7,
+    max_new_tokens: int = 50,
+):
+    """
+    Run a single QA query.
+    
+    Args:
+        model: Loaded model.
+        tokenizer: Loaded tokenizer.
+        question: Question to ask.
+        context: Optional context for the question.
+        temperature: Generation temperature.
+        max_new_tokens: Maximum new tokens to generate.
+        
+    Returns:
+        Generated answer.
+    """
+    if context:
+        prompt = f"Context: {context}\n\nQuestion: {question}"
+    else:
+        prompt = question
+    
+    return generate_response(
+        model=model,
+        tokenizer=tokenizer,
+        prompt=prompt,
+        temperature=temperature,
+        max_new_tokens=max_new_tokens,
+    )
 
 
 def main():
-    # Model and adapter paths
-    base_model_name = "google/gemma-3-1b-it"
-    adapter_path = "./gemma-lora-squad-final"
-
-    print(f"Loading base model: {base_model_name}")
-
-    # Quantization config
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
+    """CLI entry point for chat interface."""
+    parser = argparse.ArgumentParser(description="Interactive chat with trained Gemma QA model")
+    parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="Path to model checkpoint or LoRA adapter (default: base model only)"
     )
-
-    # Load base model
-    model = AutoModelForCausalLM.from_pretrained(
-        base_model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16,
+    parser.add_argument(
+        "--base-model",
+        type=str,
+        default="google/gemma-3-1b-it",
+        help="Base model name (default: google/gemma-3-1b-it)"
     )
-
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-
-    # Load LoRA adapter
-    print(f"Loading LoRA adapter from: {adapter_path}")
-    model = PeftModel.from_pretrained(model, adapter_path)
-
-    # 1. Define the message structure
-    messages = [
-        {"role": "user", "content": "What is the capital of France?"}
-    ]
-
-    # 2. Apply the template (Adds <start_of_turn>, <end_of_turn>, etc. automatically)
-    input_ids = tokenizer.apply_chat_template(
-        messages,
-        return_tensors="pt",
-        add_generation_prompt=True
-    ).to("cuda")
-
-    print(f"\nPrompt (Formatted): {tokenizer.decode(input_ids[0])}")
-    print("\nGenerating...")
-
-    # 3. Add explicit EOS token handling
-    terminators = [
-        tokenizer.eos_token_id,
-        tokenizer.convert_tokens_to_ids("<end_of_turn>")
-    ]
-
-    outputs = model.generate(
-        input_ids,
-        max_new_tokens=50,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.9,
-        eos_token_id=terminators  # Stop exactly when the model finishes the turn
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.7,
+        help="Generation temperature (default: 0.7)"
     )
-
-    # 4. Decode ONLY the new response (remove the input prompt)
-    response = outputs[0][input_ids.shape[-1]:]
-    print(f"\nResponse:\n{tokenizer.decode(response, skip_special_tokens=True)}")
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=50,
+        help="Maximum new tokens (default: 50)"
+    )
+    parser.add_argument(
+        "--no-lora",
+        action="store_true",
+        help="Checkpoint is a full model, not a LoRA adapter"
+    )
+    parser.add_argument(
+        "--question", "-q",
+        type=str,
+        default=None,
+        help="Single question to ask (non-interactive mode)"
+    )
+    parser.add_argument(
+        "--context", "-c",
+        type=str,
+        default=None,
+        help="Context for the question (non-interactive mode)"
+    )
+    
+    args = parser.parse_args()
+    
+    configure_logging()
+    
+    model, tokenizer = load_model_for_inference(
+        checkpoint_path=args.checkpoint,
+        base_model_name=args.base_model,
+        is_lora=not args.no_lora,
+    )
+    
+    if args.question:
+        # Single query mode
+        answer = run_single_query(
+            model=model,
+            tokenizer=tokenizer,
+            question=args.question,
+            context=args.context,
+            temperature=args.temperature,
+            max_new_tokens=args.max_tokens,
+        )
+        print(f"Answer: {answer}")
+    else:
+        # Interactive mode
+        run_chat(
+            model=model,
+            tokenizer=tokenizer,
+            temperature=args.temperature,
+            max_new_tokens=args.max_tokens,
+        )
 
 
 if __name__ == "__main__":

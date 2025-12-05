@@ -1,19 +1,20 @@
 """
-Utility helpers
+Logging utilities using structlog.
 """
 
 import logging
-import random
 import sys
 
-import numpy as np
 import structlog
-import torch
 
 
 def configure_logging(log_level: str = "INFO"):
-    """Configures structlog and intercepts standard library logs."""
-
+    """
+    Configures structlog and intercepts standard library logs.
+    
+    Args:
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR).
+    """
     shared_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
@@ -54,27 +55,21 @@ def configure_logging(log_level: str = "INFO"):
 
     root_logger.setLevel(log_level.upper())
 
+    # Reduce noise from libraries
     logging.getLogger("datasets").setLevel(logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.INFO)
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Helper function to get a structlog logger.
+    """
+    Get a structlog logger.
 
     Usage: logger = get_logger(__name__)
+    
+    Args:
+        name: Logger name, typically __name__.
+        
+    Returns:
+        Configured structlog bound logger.
     """
     return structlog.get_logger(name)
-
-
-def set_seed(seed):
-    """Set seed for reproducibility across random, numpy, and torch."""
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-
-    get_logger(__name__).info("Seed set", seed=seed)

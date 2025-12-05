@@ -38,8 +38,12 @@ torch = [
 where = ["src"]
 
 [project.scripts]
-gemmaqa-train = "gemmaqa.finetuning.train:main"
-gemmaqa-eval  = "gemmaqa.inference.eval:main"
-gemmaqa-chat  = "gemmaqa.inference.chat:main"
-gemmaqa-check-cuda = "gemmaqa.utils.cuda_check:main"
-gemmaqa-prepare-data = "gemmaqa.finetuning.prepare_data:main"
+# Unified CLI
+gemmaqa = "gemmaqa.cli:main"
+
+# Individual commands (backward compatible)
+gemmaqa-train = "gemmaqa.finetuning.trainer:main"
+gemmaqa-eval = "gemmaqa.evaluation.evaluation_runner:main"
+gemmaqa-chat = "gemmaqa.inference.chat:main"
+gemmaqa-check-cuda = "gemmaqa.utils.cuda:main"
+gemmaqa-prepare-data = "gemmaqa.data.prepare:main"

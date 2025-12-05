@@ -3,12 +3,11 @@ LoRA finetuning model loader.
 Loads the base model and applies LoRA adapters for parameter-efficient finetuning.
 """
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, TaskType, prepare_model_for_kbit_training
 
 from gemmaqa.config import QAConfig
 from gemmaqa.utils import get_logger
+from gemmaqa.finetuning.base import load_base_model, load_tokenizer
 
 logger = get_logger(__name__)
 
@@ -29,31 +28,13 @@ def get_lora_model(cfg: QAConfig):
         raise ValueError("LoRA mode requires adapter configuration in config.yaml")
     
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
+    tokenizer = load_tokenizer(cfg.model_name)
     
-    # Quantization config
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
-
-    # Load base model
-    model = AutoModelForCausalLM.from_pretrained(
-        cfg.model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16
-    )
-    
-    # Enable gradient checkpointing for memory efficiency
-    if cfg.training.gradient_checkpointing:
-        model.gradient_checkpointing_enable()
-        logger.info("Gradient checkpointing enabled")
+    # Load base model with quantization
+    model = load_base_model(cfg.model_name, quantize=True)
     
     # Prepare for k-bit training
-    model = prepare_model_for_kbit_training(model)
+    model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=cfg.training.gradient_checkpointing, )
     
     # Configure LoRA from config
     peft_config = LoraConfig(
@@ -79,4 +60,3 @@ def get_lora_model(cfg: QAConfig):
     model.print_trainable_parameters()
     
     return model, tokenizer
-

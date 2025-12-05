@@ -1,15 +1,29 @@
+"""
+QA evaluation metrics for SQuAD-style datasets.
+"""
+
 from collections import defaultdict
 
 import evaluate
 import numpy as np
 
-from gemmaqa.utils.utils import get_logger
+from gemmaqa.utils import get_logger
 
 logger = get_logger(__name__)
 
 
 def compute_metrics_fn(eval_pred, examples, features) -> dict[str, float]:
-    """Robust compute_metrics for Trainer."""
+    """
+    Robust compute_metrics for Trainer.
+    
+    Args:
+        eval_pred: EvalPrediction from Trainer.
+        examples: Original dataset examples.
+        features: Tokenized features with offset mappings.
+        
+    Returns:
+        Dict with 'em' (exact match) and 'f1' scores.
+    """
     safe_ret = {"em": 0.0, "f1": 0.0}
     predictions, _ = eval_pred
 
@@ -40,10 +54,18 @@ def compute_metrics_fn(eval_pred, examples, features) -> dict[str, float]:
 def postprocess_qa_predictions_for_eval(
     examples, features, raw_predictions, n_best_size=20, max_answer_length=30
 ) -> tuple:
-    """Convert raw model logits to SQuAD-formatted prediction & reference lists for evaluate.squad.
+    """
+    Convert raw model logits to SQuAD-formatted prediction & reference lists.
+    
+    Args:
+        examples: Original dataset examples.
+        features: Tokenized features with offset mappings.
+        raw_predictions: Tuple of (start_logits, end_logits).
+        n_best_size: Number of best predictions to consider.
+        max_answer_length: Maximum answer length in characters.
 
     Returns:
-        A tuple with two elements
+        A tuple with two elements:
         - list of {"id": id, "prediction_text": text}
         - list of {"id": id, "answers": {"text": [...], "answer_start": [...]}}
     """

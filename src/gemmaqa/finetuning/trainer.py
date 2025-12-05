@@ -1,6 +1,5 @@
 """
-Main training entry point.
-Supports full finetuning, LoRA, and layer freezing modes via CLI arguments.
+Training orchestration for all finetuning modes.
 """
 
 import argparse
@@ -9,20 +8,26 @@ from pathlib import Path
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
 
 from gemmaqa.config import QAConfig
-from gemmaqa.utils.utils import configure_logging, set_seed, get_logger
-from .lora import get_lora_model
-from .full import get_full_model
-from .freeze import get_freeze_model
-from .data import load_and_process_data
+from gemmaqa.config.settings import DEFAULT_CONFIG_PATH
+from gemmaqa.utils import configure_logging, set_seed, get_logger
+from gemmaqa.data import load_and_process_data
+from gemmaqa.finetuning.lora import get_lora_model
+from gemmaqa.finetuning.full import get_full_model
+from gemmaqa.finetuning.freeze import get_freeze_model
 
 logger = get_logger(__name__)
 
-# Default config path relative to this file
-DEFAULT_CONFIG = Path(__file__).parent.parent / "config.yaml"
-
 
 def get_model_and_tokenizer(cfg: QAConfig):
-    """Route to the correct model loader based on mode."""
+    """
+    Route to the correct model loader based on mode.
+    
+    Args:
+        cfg: QAConfig with mode and model settings.
+        
+    Returns:
+        Tuple of (model, tokenizer)
+    """
     if cfg.mode == "lora":
         return get_lora_model(cfg)
     elif cfg.mode == "full":
@@ -34,8 +39,15 @@ def get_model_and_tokenizer(cfg: QAConfig):
 
 
 def build_training_args(cfg: QAConfig) -> TrainingArguments:
-    """Build TrainingArguments from config."""
-    # Calculate gradient accumulation steps
+    """
+    Build TrainingArguments from config.
+    
+    Args:
+        cfg: QAConfig with training settings.
+        
+    Returns:
+        TrainingArguments instance.
+    """
     grad_accum = cfg.training.effective_batch_size // cfg.training.per_device_train_batch_size
     
     return TrainingArguments(
@@ -51,37 +63,20 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
         save_total_limit=cfg.training.save_total_limit,
         fp16=cfg.training.fp16,
         report_to="none",
-        # For quick testing, can override with max_steps
-        max_steps=3,  # Short run for verification
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Train Gemma QA model")
-    parser.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        choices=["full", "lora", "freeze"],
-        help="Training mode: full (full finetuning), lora (LoRA adapters), freeze (layer freezing)"
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        default=str(DEFAULT_CONFIG),
-        help=f"Path to YAML config file (default: {DEFAULT_CONFIG})"
-    )
-    args = parser.parse_args()
+def run_training(cfg: QAConfig, data_path: str | None = None, max_steps: int | None = None):
+    """
+    Run the training pipeline.
     
-    # Setup logging
-    configure_logging()
-    
-    # Load config
-    logger.info("Loading config", path=args.config, mode=args.mode)
-    cfg = QAConfig.load(args.config, args.mode)
-    
+    Args:
+        cfg: QAConfig with all settings.
+        data_path: Optional path to training data JSON.
+        max_steps: Optional max steps override (for testing).
+    """
     # Set seed for reproducibility
-    set_seed(int(cfg.seed))
+    set_seed(cfg.seed)
     
     # Load model and tokenizer
     logger.info("Loading model", mode=cfg.mode)
@@ -91,7 +86,7 @@ def main():
     logger.info("Loading data")
     tokenized_datasets = load_and_process_data(
         tokenizer,
-        data_path="data/train_subset.json",
+        data_path=data_path or "data/train_subset.json",
         num_samples=cfg.data.max_train_samples
     )
     
@@ -100,6 +95,11 @@ def main():
     
     # Training arguments
     training_args = build_training_args(cfg)
+    
+    # Override max_steps if specified (for testing)
+    if max_steps is not None:
+        training_args.max_steps = max_steps
+    
     logger.info("Training args", output_dir=training_args.output_dir, lr=training_args.learning_rate)
     
     # Trainer
@@ -128,6 +128,46 @@ def main():
     logger.info("Training complete!")
 
 
+def main():
+    """CLI entry point for training."""
+    parser = argparse.ArgumentParser(description="Train Gemma QA model")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        required=True,
+        choices=["full", "lora", "freeze"],
+        help="Training mode: full (full finetuning), lora (LoRA adapters), freeze (layer freezing)"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=str(DEFAULT_CONFIG_PATH),
+        help=f"Path to YAML config file (default: {DEFAULT_CONFIG_PATH})"
+    )
+    parser.add_argument(
+        "--data",
+        type=str,
+        default=None,
+        help="Path to training data JSON (default: data/train_subset.json)"
+    )
+    parser.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Max training steps (for testing, overrides epochs)"
+    )
+    args = parser.parse_args()
+    
+    # Setup logging
+    configure_logging()
+    
+    # Load config
+    logger.info("Loading config", path=args.config, mode=args.mode)
+    cfg = QAConfig.load(args.config, args.mode)
+    
+    # Run training
+    run_training(cfg, data_path=args.data, max_steps=args.max_steps)
+
+
 if __name__ == "__main__":
     main()
-

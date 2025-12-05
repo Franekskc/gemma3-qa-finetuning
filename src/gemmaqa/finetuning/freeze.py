@@ -3,32 +3,28 @@ Layer freezing model loader.
 Loads the base model and freezes all layers except the last N.
 """
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
-
 from gemmaqa.config import QAConfig
-from gemmaqa.utils.utils import get_logger
+from gemmaqa.utils import get_logger
+from gemmaqa.finetuning.base import load_base_model, load_tokenizer, log_trainable_params
 
 logger = get_logger(__name__)
 
-# Default number of layers to keep trainable (from the end)
-DEFAULT_TRAINABLE_LAYERS = 4
 
-
-def get_freeze_model(cfg: QAConfig, num_trainable_layers: int = DEFAULT_TRAINABLE_LAYERS):
+def get_freeze_model(cfg: QAConfig):
     """
     Loads the base model with layer freezing for efficient finetuning.
     
-    Freezes all layers except the last `num_trainable_layers` layers,
+    Freezes all layers except the last N layers (from cfg.freeze.trainable_layers),
     which remain trainable for task-specific adaptation.
     
     Args:
-        cfg: QAConfig with model_name and training settings.
-        num_trainable_layers: Number of layers from the end to keep trainable.
+        cfg: QAConfig with model_name, training settings, and freeze config.
         
     Returns:
         Tuple of (model, tokenizer)
     """
+    num_trainable_layers = cfg.freeze.trainable_layers
+    
     logger.info(
         "Loading model with layer freezing",
         model=cfg.model_name,
@@ -36,23 +32,10 @@ def get_freeze_model(cfg: QAConfig, num_trainable_layers: int = DEFAULT_TRAINABL
     )
     
     # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
+    tokenizer = load_tokenizer(cfg.model_name)
     
-    # Quantization config for memory efficiency on 8GB GPU
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
-
-    # Load base model
-    model = AutoModelForCausalLM.from_pretrained(
-        cfg.model_name,
-        quantization_config=bnb_config,
-        device_map="auto",
-        torch_dtype=torch.float16
-    )
+    # Load base model with quantization
+    model = load_base_model(cfg.model_name, quantize=True)
     
     # Freeze all parameters first
     for param in model.parameters():
@@ -89,14 +72,7 @@ def get_freeze_model(cfg: QAConfig, num_trainable_layers: int = DEFAULT_TRAINABL
         model.gradient_checkpointing_enable()
         logger.info("Gradient checkpointing enabled")
     
-    # Count trainable parameters
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    total_params = sum(p.numel() for p in model.parameters())
-    logger.info(
-        "Model parameters",
-        trainable=f"{trainable_params:,}",
-        total=f"{total_params:,}",
-        trainable_pct=f"{100 * trainable_params / total_params:.2f}%"
-    )
+    # Log trainable parameters
+    log_trainable_params(model)
     
     return model, tokenizer
