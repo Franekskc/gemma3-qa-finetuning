@@ -7,11 +7,12 @@ import argparse
 import random
 
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 from transformers import AutoTokenizer
 from peft import PeftModel
 
 from gemmaqa.finetuning.base import load_base_model
+from gemmaqa.evaluation.metrics import compute_exact_match, compute_f1
 from gemmaqa.utils import configure_logging, get_logger
 
 logger = get_logger(__name__)
@@ -72,17 +73,21 @@ def run_evaluation(
     
     # Select random samples
     indices = random.sample(range(len(dataset)), min(num_samples, len(dataset)))
-    examples = dataset.select(indices)
+    examples: Dataset = dataset.select(indices)
 
     print(f"\nEvaluating on {len(examples)} samples...\n")
-    print("-" * 50)
+    print("=" * 60)
 
     terminators = [
         tokenizer.eos_token_id,
         tokenizer.convert_tokens_to_ids("<end_of_turn>")
     ]
 
-    for example in examples:
+    # Track scores
+    all_em_scores = []
+    all_f1_scores = []
+
+    for i, example in enumerate(examples):
         context = example['context']
         question = example['question']
         ground_truth_answers = example['answers']['text']
@@ -111,11 +116,29 @@ def run_evaluation(
         response = outputs[0][input_ids.shape[-1]:]
         model_answer = tokenizer.decode(response, skip_special_tokens=True).strip()
 
-        print(f"Question: {question}")
-        print(f"Context (truncated): {context[:100]}...")
-        print(f"Ground Truth: {ground_truth_answers}")
-        print(f"Model Answer: {model_answer}")
-        print("-" * 50)
+        # Calculate metrics for this sample
+        em_score = compute_exact_match(model_answer, ground_truth_answers)
+        f1_score = compute_f1(model_answer, ground_truth_answers)
+        all_em_scores.append(em_score)
+        all_f1_scores.append(f1_score)
+
+        print(f"[{i+1}/{len(examples)}] Question: {question}")
+        print(f"    Context: {context[:80]}...")
+        print(f"    Ground Truth: {ground_truth_answers}")
+        print(f"    Model Answer: {model_answer}")
+        print(f"    EM: {em_score:.0f}  |  F1: {f1_score:.2f}")
+        print("-" * 60)
+
+    # Print aggregate scores
+    avg_em = sum(all_em_scores) / len(all_em_scores) * 100
+    avg_f1 = sum(all_f1_scores) / len(all_f1_scores) * 100
+    
+    print("\n" + "=" * 60)
+    print(f"AGGREGATE SCORES ({len(examples)} samples)")
+    print("=" * 60)
+    print(f"  Exact Match:  {avg_em:.1f}%")
+    print(f"  F1 Score:     {avg_f1:.1f}%")
+    print("=" * 60)
 
 
 def main():

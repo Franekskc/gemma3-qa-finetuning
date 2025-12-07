@@ -214,3 +214,39 @@ __marimo__/
 
 # JetBrains IDE
 .idea
+
+# =============================================================================
+# Project-specific ignores
+# =============================================================================
+
+# Training outputs and checkpoints
+outputs/
+gemma-lora-squad/
+gemma-lora-squad-final/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Data files (generated, not source)
+data/train_subset.json
+data/test_subset.json
+data/corpus.json
+
+# FAISS indexes
+faiss_squad_index/
+*.faiss
+
+# HuggingFace cache
+.cache/
+huggingface/
+
+# Model downloads (large files)
+*.gguf
+
+# Wandb (if used)
+wandb/
+
+# TensorBoard logs
+runs/
+logs/

@@ -10,7 +10,7 @@ from transformers import Trainer, TrainingArguments, DataCollatorForLanguageMode
 from gemmaqa.config import QAConfig
 from gemmaqa.config.settings import DEFAULT_CONFIG_PATH
 from gemmaqa.utils import configure_logging, set_seed, get_logger
-from gemmaqa.data import load_and_process_data
+from gemmaqa.data import load_train_and_eval_data
 from gemmaqa.finetuning.lora import get_lora_model
 from gemmaqa.finetuning.full import get_full_model
 from gemmaqa.finetuning.freeze import get_freeze_model
@@ -63,6 +63,10 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
         save_total_limit=cfg.training.save_total_limit,
         fp16=cfg.training.fp16,
         report_to="none",
+        # Evaluation settings
+        eval_strategy="epoch",
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
     )
 
 
@@ -82,13 +86,16 @@ def run_training(cfg: QAConfig, data_path: str | None = None, max_steps: int | N
     logger.info("Loading model", mode=cfg.mode)
     model, tokenizer = get_model_and_tokenizer(cfg)
     
-    # Load and process data
+    # Load and process data (train + eval)
     logger.info("Loading data")
-    tokenized_datasets = load_and_process_data(
+    datasets = load_train_and_eval_data(
         tokenizer,
-        data_path=data_path or "data/train_subset.json",
-        num_samples=cfg.data.max_train_samples
+        train_data_path=data_path or "data/train_subset.json",
+        train_samples=cfg.data.max_train_samples,
+        val_samples=cfg.data.val_samples,
     )
+    train_dataset = datasets["train"]
+    eval_dataset = datasets["eval"]
     
     # Data collator
     data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
@@ -106,7 +113,8 @@ def run_training(cfg: QAConfig, data_path: str | None = None, max_steps: int | N
     trainer = Trainer(
         model=model,
         args=training_args,
-        train_dataset=tokenized_datasets,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         data_collator=data_collator,
     )
     

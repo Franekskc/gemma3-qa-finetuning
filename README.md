@@ -163,6 +163,7 @@ common:
   
   data:
     max_train_samples: 10000
+    val_samples: 500           # Validation samples (from SQuAD validation split)
     max_seq_len: 384
   
   training:
@@ -201,7 +202,7 @@ modes:
 
 ```python
 from gemmaqa.config import QAConfig
-from gemmaqa.data import load_and_process_data
+from gemmaqa.data import load_and_process_data, load_train_and_eval_data
 from gemmaqa.finetuning import get_lora_model, run_training
 from gemmaqa.inference import load_model_for_inference
 from gemmaqa.utils import get_logger, set_seed, configure_logging
@@ -212,8 +213,17 @@ cfg = QAConfig.load("config/default.yaml", selected_mode="lora")
 # Load model
 model, tokenizer = get_lora_model(cfg)
 
-# Load data
+# Load data (training only)
 dataset = load_and_process_data(tokenizer, num_samples=1000)
+
+# Load data (training + validation for eval during training)
+datasets = load_train_and_eval_data(
+    tokenizer,
+    train_samples=1000,
+    val_samples=500  # Uses SQuAD validation split
+)
+train_dataset = datasets["train"]
+eval_dataset = datasets["eval"]
 
 # For inference
 model, tokenizer = load_model_for_inference(
