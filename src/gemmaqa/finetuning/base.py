@@ -66,7 +66,7 @@ def load_base_model(
         model_name,
         quantization_config=bnb_config,
         device_map=device_map,
-        torch_dtype=torch.float16,
+        dtype=torch.float16,
     )
 
 

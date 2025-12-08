@@ -57,7 +57,7 @@ def configure_logging(log_level: str = "INFO"):
 
     # Reduce noise from libraries
     logging.getLogger("datasets").setLevel(logging.WARNING)
-    logging.getLogger("transformers").setLevel(logging.INFO)
+    logging.getLogger("transformers").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
