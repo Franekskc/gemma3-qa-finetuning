@@ -147,8 +147,8 @@ def main():
     parser.add_argument(
         "--checkpoint",
         type=str,
-        required=True,
-        help="Path to model checkpoint or LoRA adapter",
+        required=False,
+        help="Path to model checkpoint or LoRA adapter. If not provided, the base model will be evaluated",
     )
     parser.add_argument(
         "--base-model",
@@ -160,7 +160,7 @@ def main():
         "--data",
         type=str,
         default=None,
-        help="Path to test data JSON (default: SQuAD validation)",
+        help="Path to test data JSON (default: data/test-subset.json)",
     )
     parser.add_argument(
         "--num-samples",
@@ -174,11 +174,6 @@ def main():
         type=float,
         default=0.1,
         help="Generation temperature (default: 0.1)",
-    )
-    parser.add_argument(
-        "--no-lora",
-        action="store_true",
-        help="Checkpoint is a full model, not a LoRA adapter",
     )
 
     args = parser.parse_args()

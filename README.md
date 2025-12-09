@@ -102,27 +102,30 @@ gemmaqa <command> [options]
 
 ### Train Command
 ```bash
-gemmaqa train --mode <mode> [--config <path>] [--data <path>] [--max-steps <n>]
+gemmaqa train --mode <mode> [--config <path>] [--train-data <path>] [--val-data <path>] [--max-steps <n>]
 ```
 
 | Argument | Required | Default | Description |
 |----------|:--------:|---------|-------------|
 | `--mode`, `-m` | ✓ | - | `full`, `lora`, or `freeze` |
 | `--config`, `-c` | | `config/default.yaml` | Path to config YAML |
-| `--data` | | `data/train_subset.json` | Training data path |
+| `--train-data` | | `data/train_subset.json` | Training data path |
+| `--val-data` | | `data/val_subset.json` | Validation data path |
 | `--max-steps` | | - | Max steps (for testing) |
 
 ### Eval Command
 ```bash
-gemmaqa eval --checkpoint <path> [--base-model <name>] [--num-samples <n>] [--no-lora]
+gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--num-samples <n>] [--test-data <path>]
 ```
 
 | Argument | Required | Default | Description |
 |----------|:--------:|---------|-------------|
-| `--checkpoint` | ✓ | - | Path to model/adapter |
+| `--checkpoint` | | - | Path to model/adapter. If not provided, the base model will be evaluated|
 | `--base-model` | | `google/gemma-3-1b-it` | Base model name |
+| `--data` | | `data/test-subset.json` | Testing data path |
 | `--num-samples`, `-n` | | `5` | Number of samples |
-| `--no-lora` | | `false` | Checkpoint is full model |
+| `--temperature` | | `0.1` | Generation temperature |
+
 
 ### Chat Command
 ```bash
@@ -154,94 +157,4 @@ gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--test-size <n>]
 
 ## Configuration
 
-Configuration is stored in `src/gemmaqa/config/default.yaml`:
-
-```yaml
-common:
-  seed: 42
-  model: google/gemma-3-1b-it
-  
-  data:
-    max_train_samples: 10000
-    val_samples: 500           # Validation samples (from SQuAD validation split)
-    max_seq_len: 384
-  
-  training:
-    num_train_epochs: 3
-    per_device_train_batch_size: 1
-    gradient_checkpointing: true
-    fp16: true
-
-modes:
-  lora:
-    training:
-      learning_rate: 1.0e-4
-      output_dir: outputs/lora
-    adapter:
-      r: 8
-      lora_alpha: 32
-      lora_dropout: 0.1
-      target_modules: [q_proj, k_proj, v_proj, o_proj]
-
-  freeze:
-    training:
-      learning_rate: 2.0e-5
-      output_dir: outputs/layer_freezing
-    freeze:
-      trainable_layers: 4  # Last N layers to keep trainable
-
-  full:
-    training:
-      learning_rate: 2.0e-5
-      output_dir: outputs/full_finetune
-```
-
----
-
-## Python API
-
-```python
-from gemmaqa.config import QAConfig
-from gemmaqa.data import load_and_process_data, load_train_and_eval_data
-from gemmaqa.finetuning import get_lora_model, run_training
-from gemmaqa.inference import load_model_for_inference
-from gemmaqa.utils import get_logger, set_seed, configure_logging
-
-# Load config
-cfg = QAConfig.load("config/default.yaml", selected_mode="lora")
-
-# Load model
-model, tokenizer = get_lora_model(cfg)
-
-# Load data (training only)
-dataset = load_and_process_data(tokenizer, num_samples=1000)
-
-# Load data (training + validation for eval during training)
-datasets = load_train_and_eval_data(
-    tokenizer,
-    train_samples=1000,
-    val_samples=500  # Uses SQuAD validation split
-)
-train_dataset = datasets["train"]
-eval_dataset = datasets["eval"]
-
-# For inference
-model, tokenizer = load_model_for_inference(
-    checkpoint_path="outputs/lora/final",
-    base_model_name="google/gemma-3-1b-it"
-)
-```
-
----
-
-## Individual Commands (Legacy)
-
-For backward compatibility, individual commands are still available:
-
-```powershell
-uv run gemmaqa-train --mode lora
-uv run gemmaqa-eval --checkpoint outputs/lora/final
-uv run gemmaqa-chat --checkpoint outputs/lora/final
-uv run gemmaqa-prepare-data --output data/
-uv run gemmaqa-check-cuda
-```
+Example configuration is stored in `src/gemmaqa/config/default.yaml`:

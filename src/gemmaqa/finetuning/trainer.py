@@ -2,18 +2,16 @@
 Training orchestration for all finetuning modes.
 """
 
-import argparse
 from pathlib import Path
 
 from transformers import DataCollatorForSeq2Seq, Trainer, TrainingArguments
 
 from gemmaqa.config import QAConfig
-from gemmaqa.config.settings import DEFAULT_CONFIG_PATH
 from gemmaqa.data import load_train_and_eval_data
 from gemmaqa.finetuning.freeze import get_freeze_model
 from gemmaqa.finetuning.full import get_full_model
 from gemmaqa.finetuning.lora import get_lora_model
-from gemmaqa.utils import configure_logging, get_logger, set_seed
+from gemmaqa.utils import get_logger, set_seed
 
 logger = get_logger(__name__)
 
@@ -153,48 +151,3 @@ def run_training(
         trainer.save_model(str(output_path))
 
     logger.info("Training complete!")
-
-
-def main():
-    """CLI entry point for training."""
-    parser = argparse.ArgumentParser(description="Train Gemma QA model")
-    parser.add_argument(
-        "--mode",
-        type=str,
-        required=True,
-        choices=["full", "lora", "freeze"],
-        help="Training mode: full (full finetuning), lora (LoRA adapters), freeze (layer freezing)",
-    )
-    parser.add_argument(
-        "--config",
-        type=str,
-        default=str(DEFAULT_CONFIG_PATH),
-        help=f"Path to YAML config file (default: {DEFAULT_CONFIG_PATH})",
-    )
-    parser.add_argument(
-        "--data",
-        type=str,
-        default=None,
-        help="Path to training data JSON (default: data/train_subset.json)",
-    )
-    parser.add_argument(
-        "--max-steps",
-        type=int,
-        default=None,
-        help="Max training steps (for testing, overrides epochs)",
-    )
-    args = parser.parse_args()
-
-    # Setup logging
-    configure_logging()
-
-    # Load config
-    logger.info("Loading config", path=args.config, mode=args.mode)
-    cfg = QAConfig.load(args.config, args.mode)
-
-    # Run training
-    run_training(cfg, train_data_path=args.data, max_steps=args.max_steps)
-
-
-if __name__ == "__main__":
-    main()

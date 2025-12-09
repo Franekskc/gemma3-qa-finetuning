@@ -3,7 +3,6 @@ Dataset preparation script.
 Downloads SQuAD dataset and creates train/test subsets and corpus.
 """
 
-import argparse
 import json
 import random
 from pathlib import Path
@@ -59,7 +58,7 @@ def prepare_dataset(
     train_subset = squad_train.select(my_train_indices)
     val_subset = squad_train.select(my_val_indices)
 
-    # 3. Test Subset (z oficjalnego validation - model nigdy tego nie widział w treningu)
+    # 3. Test Subset
     val_indices = list(range(len(squad_val)))
     random.shuffle(val_indices)
     test_subset = squad_val.select(val_indices[:test_size])
@@ -106,45 +105,3 @@ def prepare_dataset(
         "test": str(test_path),
         "corpus": str(corpus_path),
     }
-
-
-def main():
-    """CLI entry point for data preparation."""
-    parser = argparse.ArgumentParser(
-        description="Prepare SQuAD dataset subsets for training and evaluation"
-    )
-    parser.add_argument(
-        "--output",
-        "-o",
-        type=str,
-        default="data",
-        help="Output directory for dataset files (default: data)",
-    )
-    parser.add_argument(
-        "--train-size",
-        type=int,
-        default=4000,
-        help="Number of training samples (default: 4000)",
-    )
-    parser.add_argument(
-        "--test-size",
-        type=int,
-        default=1000,
-        help="Number of test samples (default: 1000)",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42, help="Random seed (default: 42)"
-    )
-
-    args = parser.parse_args()
-
-    prepare_dataset(
-        output_dir=args.output,
-        train_size=args.train_size,
-        test_size=args.test_size,
-        seed=args.seed,
-    )
-
-
-if __name__ == "__main__":
-    main()
