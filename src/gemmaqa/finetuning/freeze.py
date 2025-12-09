@@ -64,6 +64,11 @@ def get_freeze_model(cfg: QAConfig):
     else:
         logger.warning("Could not find model layers for freezing, all parameters remain frozen")
     
+    if hasattr(model, 'model') and hasattr(model.model, 'norm'):
+        for param in model.model.norm.parameters():
+            param.requires_grad = True
+        logger.info("Final Layer Norm unfrozen")
+
     # Also unfreeze the LM head for output adaptation
     if hasattr(model, 'lm_head'):
         for param in model.lm_head.parameters():
