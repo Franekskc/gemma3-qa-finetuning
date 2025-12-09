@@ -138,7 +138,7 @@ def main():
         cfg = QAConfig.load(config_path, args.mode)
         
         from gemmaqa.finetuning.trainer import run_training
-        run_training(cfg, data_path=args.data, max_steps=args.max_steps)
+        run_training(cfg, train_data_path=args.data, max_steps=args.max_steps)
         
     elif args.command == "eval":
         from gemmaqa.evaluation.evaluation_runner import load_model_for_eval, run_evaluation

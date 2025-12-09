@@ -51,7 +51,7 @@ def run_evaluation(
     model,
     tokenizer,
     num_samples: int = 5,
-    data_path: str | None = None,
+    data_path: str = "data/test_subset.json",
     temperature: float = 0.1,
     max_new_tokens: int = 50,
 ):

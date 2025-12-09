@@ -49,7 +49,7 @@ class TrainingConfig:
     warmup_ratio: float
     early_stopping_patience: int
     logging_steps: int
-    fp16: bool
+    bf16: bool
     gradient_checkpointing: bool
     gradient_accumulation_steps: int
     save_total_limit: int

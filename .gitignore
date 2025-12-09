@@ -230,6 +230,7 @@ gemma-lora-squad-final/
 
 # Data files (generated, not source)
 data/train_subset.json
+data/val_subset.json
 data/test_subset.json
 data/corpus.json
 
