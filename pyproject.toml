@@ -8,17 +8,16 @@ dependencies = [
     "bs4>=0.0.2",
     "datasets>=4.4.1",
     "evaluate>=0.4.6",
-    "faiss-cpu>=1.12.0",
-    "langchain-community>=0.4.1",
-    "langchain-huggingface>=1.1.0",
-    "langchain-text-splitters>=1.0.0",
-    "langchain[openai]>=1.0.7",
-    "langgraph>=1.0.3",
     "peft>=0.18.0",
+    "pyyaml>=6.0.3",
+    "scikit-learn>=1.7.2",
     "sentence-transformers>=5.1.2",
-    "torch>=2.5.0",
-    "transformers>=4.40.0",
     "bitsandbytes>=0.43.0",
+    "torch>=2.6.0",
+    "torch-optimi>=0.3.2",
+    "transformers>=4.57.1",
+    "structlog>=25.5.0",
+    "faiss-cpu>=1.13.0",
 ]
 
 [build-system]
@@ -39,8 +38,12 @@ torch = [
 where = ["src"]
 
 [project.scripts]
-gemmaqa-train = "gemmaqa.finetuning.train:main"
-gemmaqa-eval  = "gemmaqa.inference.eval:main"
-gemmaqa-chat  = "gemmaqa.inference.chat:main"
-gemmaqa-check-cuda = "gemmaqa.utils.cuda_check:main"
-gemmaqa-prepare-data = "gemmaqa.finetuning.prepare_data:main"
+# Unified CLI
+gemmaqa = "gemmaqa.cli:main"
+
+# Individual commands (backward compatible)
+gemmaqa-train = "gemmaqa.finetuning.trainer:main"
+gemmaqa-eval = "gemmaqa.evaluation.evaluation_runner:main"
+gemmaqa-chat = "gemmaqa.inference.chat:main"
+gemmaqa-check-cuda = "gemmaqa.utils.cuda:main"
+gemmaqa-prepare-data = "gemmaqa.data.prepare:main"

@@ -1,0 +1,51 @@
+# Common configuration
+common:
+  seed: 42
+  model: google/gemma-3-1b-it
+
+  data:
+    max_train_samples: 500
+    val_samples: 100
+
+    # Tokenization
+    max_seq_len: 384 # FIXME: this should be set to 600 in order to not truncate the context!
+    doc_stride: 128
+  
+  training:
+    output_dir: outputs/model_v1
+    num_train_epochs: 3 # FIXME: temporary set to very low
+    per_device_train_batch_size: 2
+    effective_batch_size: 8
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    logging_steps: 1 # FIXME: temporary set to very low
+    early_stopping_patience: 1
+    gradient_checkpointing: true
+    gradient_accumulation_steps: 4
+    save_total_limit: 1
+    bf16: true
+
+# Mode specific configuration
+modes:
+  full:
+    training:
+      learning_rate: 2.0e-5
+      output_dir: outputs/full_finetune
+
+  freeze:
+    training:
+      learning_rate: 2.0e-5
+      output_dir: outputs/layer_freezing
+    freeze:
+      trainable_layers: 4
+
+  lora:
+    training:
+      learning_rate: 2.0e-4
+      output_dir: outputs/lora
+    
+    adapter:
+      r: 8
+      lora_alpha: 32
+      lora_dropout: 0.1
+      target_modules: [q_proj, v_proj] # can include [q_proj, k_proj, v_proj, o_proj]
