@@ -43,6 +43,7 @@ def load_base_model(
     model_name: str,
     quantize: bool = True,
     device_map: str = "auto",
+    dtype: torch.dtype = torch.float16
 ) -> PreTrainedModel:
     """
     Load base model with optional quantization.
@@ -66,7 +67,7 @@ def load_base_model(
         model_name,
         quantization_config=bnb_config,
         device_map=device_map,
-        dtype=torch.float16,
+        dtype=dtype,
     )
 
 

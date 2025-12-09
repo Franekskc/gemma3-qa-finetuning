@@ -67,6 +67,7 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
         save_total_limit=cfg.training.save_total_limit,
         bf16=cfg.training.bf16,
         report_to="none",
+        optim="stable_adamw",
         # Evaluation settings
         eval_strategy="epoch",
         load_best_model_at_end=True,
@@ -96,7 +97,7 @@ def run_training(
     logger.info("Loading model", mode=cfg.mode)
     model, tokenizer = get_model_and_tokenizer(cfg)
 
-    
+    tokenizer.padding_side = "right"
 
     # Load and process data (train + eval)
     logger.info("Loading data")

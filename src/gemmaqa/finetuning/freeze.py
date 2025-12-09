@@ -3,6 +3,7 @@ Layer freezing model loader.
 Loads the base model and freezes all layers except the last N.
 """
 
+import torch
 from gemmaqa.config import QAConfig
 from gemmaqa.utils import get_logger
 from gemmaqa.finetuning.base import load_base_model, load_tokenizer, log_trainable_params
@@ -33,9 +34,11 @@ def get_freeze_model(cfg: QAConfig):
     
     # Load tokenizer
     tokenizer = load_tokenizer(cfg.model_name)
+
+    target_dtype = torch.bfloat16
     
     # Load base model with quantization
-    model = load_base_model(cfg.model_name, quantize=True)
+    model = load_base_model(cfg.model_name, quantize=False, dtype=target_dtype)
     
     # Freeze all parameters first
     for param in model.parameters():

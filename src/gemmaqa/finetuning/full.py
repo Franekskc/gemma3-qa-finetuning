@@ -3,6 +3,7 @@ Full finetuning model loader.
 Loads the base model without any adapters for standard finetuning.
 """
 
+import torch
 from gemmaqa.config import QAConfig
 from gemmaqa.utils import get_logger
 from gemmaqa.finetuning.base import load_base_model, load_tokenizer, log_trainable_params
@@ -24,9 +25,11 @@ def get_full_model(cfg: QAConfig):
     
     # Load tokenizer
     tokenizer = load_tokenizer(cfg.model_name)
+
+    target_dtype = torch.bfloat16
     
     # Load base model with quantization
-    model = load_base_model(cfg.model_name, quantize=True)
+    model = load_base_model(cfg.model_name, quantize=False, dtype=target_dtype)
     
     # Enable gradient checkpointing for memory efficiency
     if cfg.training.gradient_checkpointing:
