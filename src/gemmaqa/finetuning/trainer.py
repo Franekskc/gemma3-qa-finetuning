@@ -4,7 +4,12 @@ Training orchestration for all finetuning modes.
 
 from pathlib import Path
 
-from transformers import DataCollatorForSeq2Seq, Trainer, TrainingArguments
+from transformers import (
+    DataCollatorForSeq2Seq,
+    EarlyStoppingCallback,
+    Trainer,
+    TrainingArguments,
+)
 
 from gemmaqa.config import QAConfig
 from gemmaqa.data import load_train_and_eval_data
@@ -126,6 +131,13 @@ def run_training(
         lr=training_args.learning_rate,
     )
 
+    trainer_callbacks = []
+    if hasattr(cfg.training, "early_stopping_patience") and cfg.training.early_stopping_patience > 0:
+        logger.info(f"Enabling Early Stopping with patience: {cfg.training.early_stopping_patience}")
+        trainer_callbacks.append(
+            EarlyStoppingCallback(early_stopping_patience=cfg.training.early_stopping_patience)
+        )
+
     # Trainer
     trainer = Trainer(
         model=model,
@@ -133,6 +145,7 @@ def run_training(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
+        callbacks=trainer_callbacks,
     )
 
     # Train
