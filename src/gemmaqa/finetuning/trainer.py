@@ -53,28 +53,27 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
     Returns:
         TrainingArguments instance.
     """
-    grad_accum = (
-        cfg.training.effective_batch_size // cfg.training.per_device_train_batch_size
-    )
 
     return TrainingArguments(
         output_dir=cfg.training.output_dir,
         num_train_epochs=cfg.training.num_train_epochs,
         per_device_train_batch_size=cfg.training.per_device_train_batch_size,
-        gradient_accumulation_steps=grad_accum,
+        gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
         learning_rate=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay,
         warmup_ratio=cfg.training.warmup_ratio,
         logging_steps=cfg.training.logging_steps,
-        save_strategy="epoch",
         save_total_limit=cfg.training.save_total_limit,
         bf16=cfg.training.bf16,
         report_to="tensorboard",
         optim="stable_adamw",
         # Evaluation settings
-        eval_strategy="epoch",
-        load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
+        eval_strategy="steps",
+        eval_steps=cfg.training.eval_steps,
+        save_strategy="steps",
+        save_steps=cfg.training.save_steps,
+        load_best_model_at_end=True,
     )
 
 
@@ -132,10 +131,17 @@ def run_training(
     )
 
     trainer_callbacks = []
-    if hasattr(cfg.training, "early_stopping_patience") and cfg.training.early_stopping_patience > 0:
-        logger.info(f"Enabling Early Stopping with patience: {cfg.training.early_stopping_patience}")
+    if (
+        hasattr(cfg.training, "early_stopping_patience")
+        and cfg.training.early_stopping_patience > 0
+    ):
+        logger.info(
+            f"Enabling Early Stopping with patience: {cfg.training.early_stopping_patience}"
+        )
         trainer_callbacks.append(
-            EarlyStoppingCallback(early_stopping_patience=cfg.training.early_stopping_patience)
+            EarlyStoppingCallback(
+                early_stopping_patience=cfg.training.early_stopping_patience
+            )
         )
 
     # Trainer
