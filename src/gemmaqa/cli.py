@@ -38,13 +38,13 @@ def main():
     train_parser.add_argument(
         "--train-data",
         type=str,
-        default=None,
+        default="data/train_subset.json",
         help="Path to training data JSON (default: data/train_subset.json)",
     )
     train_parser.add_argument(
         "--val-data",
         type=str,
-        default=None,
+        default="data/val_subset.json",
         help="Path to validation data JSON (default: data/val_subset.json)",
     )
     train_parser.add_argument(
@@ -72,8 +72,8 @@ def main():
     eval_parser.add_argument(
         "--data",
         type=str,
-        default=None,
-        help="Path to test data JSON (default: data/test-subset.json)",
+        default="data/test_subset.json",
+        help="Path to test data JSON (default: data/test_subset.json)",
     )
     eval_parser.add_argument(
         "--num-samples",
