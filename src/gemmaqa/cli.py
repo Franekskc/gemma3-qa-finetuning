@@ -165,6 +165,7 @@ def main():
         run_evaluation(
             model,
             tokenizer,
+            checkpoint_path=args.checkpoint,
             num_samples=args.num_samples,
             data_path=args.data,
             temperature=args.temperature,
