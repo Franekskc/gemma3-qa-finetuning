@@ -82,12 +82,6 @@ def main():
         default=5,
         help="Number of samples to evaluate (default: 5)",
     )
-    eval_parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.1,
-        help="Generation temperature (default: 0.1)",
-    )
 
     # -------------------------------------------------------------------------
     # Chat subcommand
@@ -168,7 +162,6 @@ def main():
             checkpoint_path=args.checkpoint,
             num_samples=args.num_samples,
             data_path=args.data,
-            temperature=args.temperature,
         )
 
     elif args.command == "chat":

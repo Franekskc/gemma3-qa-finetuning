@@ -75,7 +75,6 @@ def run_evaluation(
     checkpoint_path: str | None = None,
     num_samples: int = 5,
     data_path: str = "data/test_subset.json",
-    temperature: float = 0.1,
     max_new_tokens: int = 50,
 ):
     """
@@ -86,7 +85,6 @@ def run_evaluation(
         tokenizer: Loaded tokenizer.
         num_samples: Number of samples to evaluate.
         data_path: Optional path to test data JSON.
-        temperature: Generation temperature.
         max_new_tokens: Maximum new tokens to generate.
     """
     # Load dataset
@@ -131,9 +129,7 @@ def run_evaluation(
             outputs = model.generate(
                 input_ids,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=temperature,
-                top_p=0.9,
+                do_sample=False,
                 eos_token_id=terminators,
             )
 
@@ -168,7 +164,6 @@ def run_evaluation(
                 "num_samples": real_num_samples,
                 "exact_match": round(avg_em, 4),
                 "f1_score": round(avg_f1, 4),
-                "temperature": temperature,
                 "data_source": data_path
             }
 

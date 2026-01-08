@@ -130,7 +130,6 @@ gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--num-samples <n>] [--
 | `--base-model` | | `google/gemma-3-1b-it` | Base model name |
 | `--data` | | `data/test-subset.json` | Testing data path |
 | `--num-samples`, `-n` | | `5` | Number of samples |
-| `--temperature` | | `0.1` | Generation temperature |
 
 
 ### Chat Command
