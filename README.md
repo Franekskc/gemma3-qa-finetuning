@@ -69,12 +69,18 @@ uv run gemmaqa train --mode full
 uv run gemmaqa train --mode freeze
 ```
 
-### 4. Evaluate
+### 4. Monitor Training (TensorBoard)
+```powershell
+# Point to the root outputs directory to compare all modes (LoRA vs Full vs Freeze)
+uv run tensorboard --logdir outputs
+```
+
+### 5. Evaluate
 ```powershell
 uv run gemmaqa eval --checkpoint outputs/lora/final --num-samples 10
 ```
 
-### 5. Chat
+### 6. Chat
 ```powershell
 # Interactive mode
 uv run gemmaqa chat --checkpoint outputs/lora/final

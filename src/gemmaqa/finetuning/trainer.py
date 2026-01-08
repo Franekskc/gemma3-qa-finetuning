@@ -69,7 +69,7 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
         save_strategy="epoch",
         save_total_limit=cfg.training.save_total_limit,
         bf16=cfg.training.bf16,
-        report_to="none",
+        report_to="tensorboard",
         optim="stable_adamw",
         # Evaluation settings
         eval_strategy="epoch",
@@ -147,6 +147,9 @@ def run_training(
         data_collator=data_collator,
         callbacks=trainer_callbacks,
     )
+
+    logger.info("Performing pre-train evaluation...")
+    trainer.evaluate()
 
     # Train
     logger.info("Starting training", mode=cfg.mode)
