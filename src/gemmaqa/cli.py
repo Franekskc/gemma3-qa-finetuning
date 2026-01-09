@@ -115,6 +115,11 @@ def main():
         "--train-size", type=int, default=4000, help="Training samples"
     )
     data_parser.add_argument("--test-size", type=int, default=1000, help="Test samples")
+    data_parser.add_argument(
+        "--mix-duorc", 
+        action="store_true", 
+        help="Augment SQuAD training data with DuoRC dataset"
+    )
 
     # -------------------------------------------------------------------------
     # Check CUDA
@@ -188,6 +193,7 @@ def main():
             output_dir=args.output,
             train_size=args.train_size,
             test_size=args.test_size,
+            mix_duorc=args.mix_duorc,
         )
 
     elif args.command == "check-cuda":

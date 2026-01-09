@@ -7,7 +7,7 @@ import json
 import random
 from pathlib import Path
 
-from datasets import Dataset, load_dataset
+from datasets import Dataset, concatenate_datasets, load_dataset
 
 from gemmaqa.utils import get_logger
 
@@ -20,15 +20,18 @@ def prepare_dataset(
     val_size_ratio: float = 0.1,
     test_size: int = 1000,
     seed: int = 42,
+    mix_duorc: bool = False,
 ) -> dict:
     """
-    Prepare SQuAD dataset subsets for training and evaluation.
+    Prepare dataset subsets for training and evaluation.
+    Can optionally mix SQuAD with DuoRC for Data Augmentation.
 
     Args:
         output_dir: Directory to save output files.
         train_size: Number of training samples to select.
         test_size: Number of test samples to select.
         seed: Random seed for reproducibility.
+        mix_duorc: If True, mixes DuoRC dataset into training data.
 
     Returns:
         Dict with paths to created files.
@@ -37,47 +40,88 @@ def prepare_dataset(
     output_dir.mkdir(parents=True, exist_ok=True)
     random.seed(seed)
 
+    # 1. Load SQuAD (Base)
     logger.info("Loading SQuAD dataset...")
     squad_train: Dataset = load_dataset("squad", split="train")
     squad_val = load_dataset("squad", split="validation")
 
-    logger.info(f"Original Train size: {len(squad_train)}")
-    logger.info(f"Original Val size: {len(squad_val)}")
+    logger.info(f"Original SQuAD Train size: {len(squad_train)}")
+    logger.info(f"Original SQuAD Val size: {len(squad_val)}")
 
-    # 1. Train Subset
-    full_train_indices = list(range(len(squad_train)))
-    random.shuffle(full_train_indices)
-    current_pool = full_train_indices[:train_size]
+    # 2. Data Augmentation (Optional)
+    raw_train_dataset = squad_train
 
-    # 2. Split Train into Train and Validation
-    split_idx = int(len(current_pool) * (1 - val_size_ratio))
+    if mix_duorc:
+        logger.info("Mixing DuoRC into Training Data...")
+        try:
+            duorc = load_dataset("duorc", "ParaphraseRC", split="train")
+            logger.info(f"Original DuoRC Train size: {len(duorc)}")
 
-    my_train_indices = current_pool[:split_idx]
-    my_val_indices = current_pool[split_idx:]
+            # --- Normalization DuoRC into SQuAD format ---
+            duorc = duorc.rename_column("plot", "context")
+            duorc = duorc.rename_column("question_id", "id")
 
-    train_subset = squad_train.select(my_train_indices)
-    val_subset = squad_train.select(my_val_indices)
+            cols_to_keep = ["context", "question", "answers", "id"]
+            squad_train = squad_train.select_columns(cols_to_keep)
+            duorc = duorc.select_columns(cols_to_keep)
 
-    # 3. Test Subset
+            # fix response format (List -> Dict)
+            # DuoRC response: ["odp1", "odp2"]
+            # SQuAD response: {'text': ["odp1"], 'answer_start': [123]}
+            def fix_duorc_structure(example):
+                return {"answers": {"text": example["answers"], "answer_start": []}}
+
+            duorc = duorc.map(fix_duorc_structure, desc="Formatting DuoRC answers")
+            duorc = duorc.cast(squad_train.features)
+
+            # Connecting
+            raw_train_dataset = concatenate_datasets([squad_train, duorc])
+            logger.info(f"Combined Size: {len(raw_train_dataset)} (SQuAD + DuoRC)")
+
+        except Exception as e:
+            logger.error(f"Failed to load DuoRC: {e}")
+            logger.info("Falling back to pure SQuAD.")
+
+    # 3. Shuffle & Slice Training Data
+    full_indices = list(range(len(raw_train_dataset)))
+    random.shuffle(full_indices)
+
+    current_pool_indices = full_indices[:train_size]
+    current_pool_dataset = raw_train_dataset.select(current_pool_indices)
+
+    # 4. Split Train into Train and Validation
+    split_idx = int(len(current_pool_dataset) * (1 - val_size_ratio))
+    train_subset = current_pool_dataset.select(range(split_idx))
+    val_subset = current_pool_dataset.select(
+        range(split_idx, len(current_pool_dataset))
+    )
+
+    # 5. Prepare Test Subset (PURE SQuAD)
+    logger.info("Preparing Test set (Pure SQuAD)...")
     val_indices = list(range(len(squad_val)))
     random.shuffle(val_indices)
     test_subset = squad_val.select(val_indices[:test_size])
 
-    # 4. Corpus (unique contexts for RAG)
-    logger.info("Building Corpus from Training set...")
+    # 6. Corpus (unique contexts from TRAIN set)
+    logger.info("Building Corpus...")
     unique_contexts = set()
     corpus = []
 
-    for example in squad_train:
+    for example in train_subset:
         ctx = example["context"]
         if ctx not in unique_contexts:
             unique_contexts.add(ctx)
-            corpus.append({"id": example["id"], "title": example["title"], "text": ctx})
+            corpus.append(
+                {
+                    "id": example["id"],
+                    "title": example.get("title", "Unknown"),
+                    "text": ctx,
+                }
+            )
 
     logger.info(f"Final Train Subset size: {len(train_subset)}")
     logger.info(f"Final Validation Subset size: {len(val_subset)}")
     logger.info(f"Final Test Subset size: {len(test_subset)}")
-    logger.info(f"Corpus size (unique contexts): {len(corpus)}")
 
     # Save to disk
     logger.info(f"Saving to {output_dir}...")
@@ -87,12 +131,13 @@ def prepare_dataset(
     test_path = output_dir / "test_subset.json"
     corpus_path = output_dir / "corpus.json"
 
-    with open(train_path, "w", encoding="utf-8") as f:
-        json.dump([ex for ex in train_subset], f, indent=2)
-    with open(val_path, "w", encoding="utf-8") as f:
-        json.dump([ex for ex in val_subset], f, indent=2)
-    with open(test_path, "w", encoding="utf-8") as f:
-        json.dump([ex for ex in test_subset], f, indent=2)
+    def save_json(data, path):
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump([ex for ex in data], f, indent=2)
+
+    save_json(train_subset, train_path)
+    save_json(val_subset, val_path)
+    save_json(test_subset, test_path)
 
     with open(corpus_path, "w", encoding="utf-8") as f:
         json.dump(corpus, f, indent=2)
