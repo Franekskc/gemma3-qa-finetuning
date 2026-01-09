@@ -148,14 +148,15 @@ gemmaqa chat [--checkpoint <path>] [--question <q>] [--context <c>] [--temperatu
 
 ### Prepare-Data Command
 ```bash
-gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--test-size <n>] [--seed <n>] [--mix-duorc <bool>]
+gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--val-size <n>] [--test-size <n>] [--seed <n>] [--mix-duorc <bool>]
 ```
 
 | Argument | Required | Default | Description |
 |----------|:--------:|---------|-------------|
 | `--output`, `-o` | | `data` | Output directory |
-| `--train-size` | | `4000` | Training samples |
-| `--test-size` | | `1000` | Test samples |
+| `--train-size` | | `5000` | Training samples |
+| `--val-size` | | `500` | Validation samples |
+| `--test-size` | | `5000` | Test samples |
 | `--seed` | | `42` | Random seed |
 | `--mix-duorc` | | `False` | mix DuoRC dataset into training data |
 

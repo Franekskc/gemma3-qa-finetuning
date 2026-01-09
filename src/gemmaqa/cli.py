@@ -112,9 +112,12 @@ def main():
         "--output", "-o", type=str, default="data", help="Output directory"
     )
     data_parser.add_argument(
-        "--train-size", type=int, default=4000, help="Training samples"
+        "--train-size", type=int, default=5000, help="Training samples"
     )
-    data_parser.add_argument("--test-size", type=int, default=1000, help="Test samples")
+    data_parser.add_argument(
+        "--val-size", type=int, default=500, help="Validation samples count"
+    )
+    data_parser.add_argument("--test-size", type=int, default=5000, help="Test samples")
     data_parser.add_argument(
         "--mix-duorc", 
         action="store_true", 
@@ -192,6 +195,7 @@ def main():
         prepare_dataset(
             output_dir=args.output,
             train_size=args.train_size,
+            val_size=args.val_size,
             test_size=args.test_size,
             mix_duorc=args.mix_duorc,
         )

@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 def prepare_dataset(
     output_dir: str | Path = "data",
     train_size: int = 4000,
-    val_size_ratio: float = 0.1,
+    val_size: int = 500,
     test_size: int = 1000,
     seed: int = 42,
     mix_duorc: bool = False,
@@ -29,6 +29,7 @@ def prepare_dataset(
     Args:
         output_dir: Directory to save output files.
         train_size: Number of training samples to select.
+        val_size: Number of validation samples to select.
         test_size: Number of test samples to select.
         seed: Random seed for reproducibility.
         mix_duorc: If True, mixes DuoRC dataset into training data.
@@ -86,15 +87,15 @@ def prepare_dataset(
     full_indices = list(range(len(raw_train_dataset)))
     random.shuffle(full_indices)
 
-    current_pool_indices = full_indices[:train_size]
-    current_pool_dataset = raw_train_dataset.select(current_pool_indices)
+    # 4. Prepare Train and Validation SubSets
+    total_needed = train_size + val_size
+    real_total = min(total_needed, len(full_indices))
+    mixed_pool = raw_train_dataset.select(full_indices[:real_total])
+    split_point = min(train_size, len(mixed_pool))
 
-    # 4. Split Train into Train and Validation
-    split_idx = int(len(current_pool_dataset) * (1 - val_size_ratio))
-    train_subset = current_pool_dataset.select(range(split_idx))
-    val_subset = current_pool_dataset.select(
-        range(split_idx, len(current_pool_dataset))
-    )
+    train_subset = mixed_pool.select(range(0, split_point))
+    val_subset = mixed_pool.select(range(split_point, len(mixed_pool)))
+
 
     # 5. Prepare Test Subset (PURE SQuAD)
     logger.info("Preparing Test set (Pure SQuAD)...")
