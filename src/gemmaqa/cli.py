@@ -15,6 +15,14 @@ def main():
         prog="gemmaqa",
         description="Gemma QA Finetuning Toolkit - Train, evaluate, and chat with Gemma models",
     )
+    
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="Set logging level (default: INFO)"
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -125,6 +133,76 @@ def main():
     )
 
     # -------------------------------------------------------------------------
+    # RAG Index
+    # -------------------------------------------------------------------------
+    rag_index_parser = subparsers.add_parser("rag-index", help="Build FAISS index for RAG")
+    rag_index_parser.add_argument(
+        "--corpus", 
+        type=str, 
+        default="data/corpus.json", 
+        help="Path to corpus JSON"
+    )
+    rag_index_parser.add_argument(
+        "--output", 
+        type=str, 
+        default="data", 
+        help="Output directory for index"
+    )
+
+    # -------------------------------------------------------------------------
+    # RAG Eval
+    # -------------------------------------------------------------------------
+    rag_eval_parser = subparsers.add_parser("rag-eval", help="Evaluate RAG pipeline")
+    rag_eval_parser.add_argument(
+        "--checkpoint",
+        type=str,
+        help="Path to model checkpoint",
+    )
+    rag_eval_parser.add_argument(
+        "--base-model",
+        type=str,
+        default="google/gemma-3-1b-it",
+        help="Base model name",
+    )
+    rag_eval_parser.add_argument(
+        "--data",
+        type=str,
+        default="data/test_subset.json",
+        help="Path to test data JSON",
+    )
+    rag_eval_parser.add_argument(
+        "--index",
+        type=str,
+        default="data/faiss_index.bin",
+        help="Path to FAISS index",
+    )
+    rag_eval_parser.add_argument(
+        "--corpus",
+        type=str,
+        default="data/corpus.json",
+        help="Path to corpus JSON",
+    )
+    rag_eval_parser.add_argument(
+        "--num-samples",
+        "-n",
+        type=int,
+        default=5,
+        help="Number of samples to evaluate",
+    )
+    rag_eval_parser.add_argument(
+        "--top-k",
+        type=int,
+        default=3,
+        help="Number of contexts to retrieve",
+    )
+    rag_eval_parser.add_argument(
+        "--output",
+        type=str,
+        default=None,
+        help="Directory to save evaluation results",
+    )
+
+    # -------------------------------------------------------------------------
     # Check CUDA
     # -------------------------------------------------------------------------
     subparsers.add_parser("check-cuda", help="Check CUDA availability")
@@ -141,7 +219,7 @@ def main():
         from gemmaqa.finetuning.trainer import run_training
         from gemmaqa.utils import configure_logging
 
-        configure_logging()
+        configure_logging(args.log_level)
         config_path = args.config
         cfg = QAConfig.load(config_path, args.mode)
 
@@ -159,7 +237,7 @@ def main():
         )
         from gemmaqa.utils import configure_logging
 
-        configure_logging()
+        configure_logging(args.log_level)
         model, tokenizer = load_model_for_eval(
             checkpoint_path=args.checkpoint,
             base_model_name=args.base_model,
@@ -177,7 +255,7 @@ def main():
         from gemmaqa.inference.model import load_model_for_inference
         from gemmaqa.utils import configure_logging
 
-        configure_logging()
+        configure_logging(args.log_level)
         model, tokenizer = load_model_for_inference(
             checkpoint_path=args.checkpoint,
             base_model_name=args.base_model,
@@ -204,4 +282,44 @@ def main():
         from gemmaqa.utils.cuda import main as cuda_main
 
         cuda_main()
+
+    elif args.command == "rag-index":
+        from gemmaqa.rag.retriever import GemmaQARetriever
+        from gemmaqa.utils import configure_logging
+        
+        configure_logging(args.log_level)
+        retriever = GemmaQARetriever()
+        retriever.index_corpus(args.corpus, args.output)
+
+    elif args.command == "rag-eval":
+        from gemmaqa.evaluation.evaluation_runner import (
+            load_model_for_eval,
+            run_evaluation,
+        )
+        from gemmaqa.rag.retriever import GemmaQARetriever
+        from gemmaqa.utils import configure_logging
+        
+        configure_logging(args.log_level)
+        
+        # Load Model
+        model, tokenizer = load_model_for_eval(
+            checkpoint_path=args.checkpoint,
+            base_model_name=args.base_model,
+        )
+        
+        # Load Retriever
+        retriever = GemmaQARetriever()
+        retriever.load_index(args.index, args.corpus)
+        
+        # Run Evaluation with RAG
+        run_evaluation(
+            model,
+            tokenizer,
+            checkpoint_path=args.checkpoint,
+            num_samples=args.num_samples,
+            data_path=args.data,
+            retriever=retriever,
+            k=args.top_k,
+            output_dir=args.output,
+        )
         

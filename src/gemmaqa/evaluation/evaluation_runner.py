@@ -76,6 +76,9 @@ def run_evaluation(
     num_samples: int = 5,
     data_path: str = "data/test_subset.json",
     max_new_tokens: int = 50,
+    retriever = None,
+    k: int = 3,
+    output_dir: str | Path | None = None,
 ):
     """
     Run evaluation on random samples.
@@ -83,9 +86,13 @@ def run_evaluation(
     Args:
         model: Loaded model.
         tokenizer: Loaded tokenizer.
+        checkpoint_path: Path to checkpoint (for saving results).
         num_samples: Number of samples to evaluate.
         data_path: Optional path to test data JSON.
         max_new_tokens: Maximum new tokens to generate.
+        retriever: Optional RAG retriever instance. If provided, runs RAG evaluation.
+        k: Number of contexts to retrieve for RAG.
+        output_dir: Custom directory to save results to. If None, tries to use checkpoint_path parent.
     """
     # Load dataset
     if data_path:
@@ -116,25 +123,50 @@ def run_evaluation(
         question = example["question"]
         ground_truth_answers = example["answers"]["text"]
 
-        # Format prompt using chat template
-        messages = [
-            {"role": "user", "content": f"Context: {context}\n\nQuestion: {question}"}
-        ]
+        logger.debug("Context: {}".format(context))
+        logger.debug("Question: {}".format(question))
+        logger.debug("Ground truth answers: {}".format(ground_truth_answers))
 
-        input_ids = tokenizer.apply_chat_template(
-            messages, return_tensors="pt", add_generation_prompt=True
-        ).to("cuda")
-
-        with torch.no_grad():
-            outputs = model.generate(
-                input_ids,
-                max_new_tokens=max_new_tokens,
-                do_sample=False,
-                eos_token_id=terminators,
+        if retriever:
+            # RAG Generation
+            from gemmaqa.rag.generator import generate_rag_response
+            
+            # We ignore the 'context' from the dataset and use 'retriever'
+            model_answer, retrieved_ctxs = generate_rag_response(
+                model=model,
+                tokenizer=tokenizer,
+                question=question,
+                retriever=retriever,
+                k=k,
+                max_new_tokens=max_new_tokens
             )
 
-        response = outputs[0][input_ids.shape[-1] :]
-        model_answer = tokenizer.decode(response, skip_special_tokens=True).strip()
+
+            # Optional: Print retrieved context titles for debugging
+            logger.debug(f"Retrieved: {[c['title'] for c in retrieved_ctxs]}")
+            logger.debug(f"Model answer: {model_answer}")
+
+        else:
+            # Standard Generation
+            # Format prompt using chat template
+            messages = [
+                {"role": "user", "content": f"Context: {context}\n\nQuestion: {question}"}
+            ]
+
+            input_ids = tokenizer.apply_chat_template(
+                messages, return_tensors="pt", add_generation_prompt=True
+            ).to("cuda")
+
+            with torch.no_grad():
+                outputs = model.generate(
+                    input_ids,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False,
+                    eos_token_id=terminators,
+                )
+
+            response = outputs[0][input_ids.shape[-1] :]
+            model_answer = tokenizer.decode(response, skip_special_tokens=True).strip()
 
         # Calculate metrics for this sample
         em_score = compute_exact_match(model_answer, ground_truth_answers)
@@ -154,25 +186,34 @@ def run_evaluation(
     print("=" * 60)
 
     # Save the results
-    if checkpoint_path:
-        output_dir = Path(checkpoint_path).parent
-        if output_dir.exists():
-            results_file = output_dir / "eval_results.json"
-            
-            results_data = {
-                "timestamp": datetime.now().isoformat(),
-                "num_samples": real_num_samples,
-                "exact_match": round(avg_em, 4),
-                "f1_score": round(avg_f1, 4),
-                "data_source": data_path
-            }
+    # Save the results
+    final_output_dir = None
+    
+    if output_dir:
+        final_output_dir = Path(output_dir)
+    elif checkpoint_path:
+        final_output_dir = Path(checkpoint_path).parent
 
-            try:
-                with open(results_file, "w", encoding="utf-8") as f:
-                    json.dump(results_data, f, indent=4)
-                
-                logger.info(f"Results saved to: {results_file}")
-            except Exception as e:
-                logger.error(f"Failed to save results: {e}")
-        else:
-            logger.warning(f"Checkpoint directory {output_dir} does not exist. Skipping save.")
+    if final_output_dir:
+        final_output_dir.mkdir(parents=True, exist_ok=True)
+        results_file = final_output_dir / "eval_results.json"
+        
+        results_data = {
+            "timestamp": datetime.now().isoformat(),
+            "num_samples": real_num_samples,
+            "exact_match": round(avg_em, 4),
+            "f1_score": round(avg_f1, 4),
+            "data_source": data_path,
+            "mode": "rag" if retriever else "standard",
+            "retriever_k": k if retriever else None
+        }
+
+        try:
+            with open(results_file, "w", encoding="utf-8") as f:
+                json.dump(results_data, f, indent=4)
+            
+            logger.info(f"Results saved to: {results_file}")
+        except Exception as e:
+            logger.error(f"Failed to save results: {e}")
+    else:
+        logger.warning("No output directory or checkpoint path provided. Results not saved to file.")
