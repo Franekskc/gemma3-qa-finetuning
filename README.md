@@ -69,12 +69,18 @@ uv run gemmaqa train --mode full
 uv run gemmaqa train --mode freeze
 ```
 
-### 4. Evaluate
+### 4. Monitor Training (TensorBoard)
+```powershell
+# Point to the root outputs directory to compare all modes (LoRA vs Full vs Freeze)
+uv run tensorboard --logdir outputs
+```
+
+### 5. Evaluate
 ```powershell
 uv run gemmaqa eval --checkpoint outputs/lora/final --num-samples 10
 ```
 
-### 5. Chat
+### 6. Chat
 ```powershell
 # Interactive mode
 uv run gemmaqa chat --checkpoint outputs/lora/final
@@ -115,7 +121,7 @@ gemmaqa train --mode <mode> [--config <path>] [--train-data <path>] [--val-data 
 
 ### Eval Command
 ```bash
-gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--num-samples <n>] [--test-data <path>]
+gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--data <path>] [--num-samples <n>]
 ```
 
 | Argument | Required | Default | Description |
@@ -124,12 +130,11 @@ gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--num-samples <n>] [--
 | `--base-model` | | `google/gemma-3-1b-it` | Base model name |
 | `--data` | | `data/test-subset.json` | Testing data path |
 | `--num-samples`, `-n` | | `5` | Number of samples |
-| `--temperature` | | `0.1` | Generation temperature |
 
 
 ### Chat Command
 ```bash
-gemmaqa chat [--checkpoint <path>] [--question <q>] [--context <c>]
+gemmaqa chat [--checkpoint <path>] [--question <q>] [--context <c>] [--temperature <f>] [--max-tokens <n>]
 ```
 
 | Argument | Required | Default | Description |
@@ -143,15 +148,17 @@ gemmaqa chat [--checkpoint <path>] [--question <q>] [--context <c>]
 
 ### Prepare-Data Command
 ```bash
-gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--test-size <n>]
+gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--val-size <n>] [--test-size <n>] [--seed <n>] [--mix-duorc <bool>]
 ```
 
 | Argument | Required | Default | Description |
 |----------|:--------:|---------|-------------|
 | `--output`, `-o` | | `data` | Output directory |
-| `--train-size` | | `4000` | Training samples |
-| `--test-size` | | `1000` | Test samples |
+| `--train-size` | | `5000` | Training samples |
+| `--val-size` | | `500` | Validation samples |
+| `--test-size` | | `5000` | Test samples |
 | `--seed` | | `42` | Random seed |
+| `--mix-duorc` | | `False` | mix DuoRC dataset into training data |
 
 ---
 

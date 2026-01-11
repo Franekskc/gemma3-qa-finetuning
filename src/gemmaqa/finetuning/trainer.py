@@ -4,7 +4,12 @@ Training orchestration for all finetuning modes.
 
 from pathlib import Path
 
-from transformers import DataCollatorForSeq2Seq, Trainer, TrainingArguments
+from transformers import (
+    DataCollatorForSeq2Seq,
+    EarlyStoppingCallback,
+    Trainer,
+    TrainingArguments,
+)
 
 from gemmaqa.config import QAConfig
 from gemmaqa.data import load_train_and_eval_data
@@ -48,28 +53,27 @@ def build_training_args(cfg: QAConfig) -> TrainingArguments:
     Returns:
         TrainingArguments instance.
     """
-    grad_accum = (
-        cfg.training.effective_batch_size // cfg.training.per_device_train_batch_size
-    )
 
     return TrainingArguments(
         output_dir=cfg.training.output_dir,
         num_train_epochs=cfg.training.num_train_epochs,
         per_device_train_batch_size=cfg.training.per_device_train_batch_size,
-        gradient_accumulation_steps=grad_accum,
+        gradient_accumulation_steps=cfg.training.gradient_accumulation_steps,
         learning_rate=cfg.training.learning_rate,
         weight_decay=cfg.training.weight_decay,
         warmup_ratio=cfg.training.warmup_ratio,
         logging_steps=cfg.training.logging_steps,
-        save_strategy="epoch",
         save_total_limit=cfg.training.save_total_limit,
         bf16=cfg.training.bf16,
-        report_to="none",
+        report_to="tensorboard",
         optim="stable_adamw",
         # Evaluation settings
-        eval_strategy="epoch",
-        load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
+        eval_strategy="steps",
+        eval_steps=cfg.training.eval_steps,
+        save_strategy="steps",
+        save_steps=cfg.training.save_steps,
+        load_best_model_at_end=True,
     )
 
 
@@ -126,6 +130,20 @@ def run_training(
         lr=training_args.learning_rate,
     )
 
+    trainer_callbacks = []
+    if (
+        hasattr(cfg.training, "early_stopping_patience")
+        and cfg.training.early_stopping_patience > 0
+    ):
+        logger.info(
+            f"Enabling Early Stopping with patience: {cfg.training.early_stopping_patience}"
+        )
+        trainer_callbacks.append(
+            EarlyStoppingCallback(
+                early_stopping_patience=cfg.training.early_stopping_patience
+            )
+        )
+
     # Trainer
     trainer = Trainer(
         model=model,
@@ -133,7 +151,11 @@ def run_training(
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
         data_collator=data_collator,
+        callbacks=trainer_callbacks,
     )
+
+    logger.info("Performing pre-train evaluation...")
+    trainer.evaluate()
 
     # Train
     logger.info("Starting training", mode=cfg.mode)

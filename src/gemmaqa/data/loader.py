@@ -32,37 +32,38 @@ def preprocess_dataset(dataset: Dataset, tokenizer: PreTrainedTokenizer, max_len
     """
     
     def tokenize_function(examples):
-        texts = []
+        model_inputs = {"input_ids": [], "attention_mask": [], "labels": []}
         
         for i in range(len(examples['context'])):
             context = examples['context'][i]
             question = examples['question'][i]
             
-            answers = examples['answers'][i]
-            if isinstance(answers, dict):
-                ans_list = answers.get('text', [])
-                answer = ans_list[0] if len(ans_list) > 0 else ""
+            if isinstance(examples['answers'][i], dict) and examples['answers'][i]['text']:
+                answer = examples['answers'][i]['text'][0]
             else:
                 answer = ""
 
-            messages = [
+            messages_user = [
                 {"role": "user", "content": f"Context: {context}\n\nQuestion: {question}"},
-                {"role": "model", "content": answer}
             ]
+            user_tokens = tokenizer.apply_chat_template(messages_user, tokenize=True, add_generation_prompt=True)
             
-            full_text = tokenizer.apply_chat_template(messages, tokenize=False)
-            texts.append(full_text)
+            messages_full = messages_user + [{"role": "model", "content": answer}]
+            full_tokens = tokenizer.apply_chat_template(messages_full, tokenize=True)
 
-        tokenized = tokenizer(
-            texts,
-            truncation=True,
-            max_length=max_length,
-            add_special_tokens=False
-        )
+            labels = full_tokens[:]
+            for j in range(len(user_tokens)):
+                labels[j] = -100
+            
+            if len(full_tokens) > max_length:
+                continue
+            
+            model_inputs["input_ids"].append(full_tokens)
+            model_inputs["labels"].append(labels)
+            model_inputs["attention_mask"].append([1] * len(full_tokens))
+
+        return model_inputs
         
-        tokenized["labels"] = tokenized["input_ids"].copy()
-        
-        return tokenized
 
     processed_dataset = dataset.map(
         tokenize_function,

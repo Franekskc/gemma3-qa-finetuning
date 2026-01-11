@@ -38,13 +38,13 @@ def main():
     train_parser.add_argument(
         "--train-data",
         type=str,
-        default=None,
+        default="data/train_subset.json",
         help="Path to training data JSON (default: data/train_subset.json)",
     )
     train_parser.add_argument(
         "--val-data",
         type=str,
-        default=None,
+        default="data/val_subset.json",
         help="Path to validation data JSON (default: data/val_subset.json)",
     )
     train_parser.add_argument(
@@ -72,8 +72,8 @@ def main():
     eval_parser.add_argument(
         "--data",
         type=str,
-        default=None,
-        help="Path to test data JSON (default: data/test-subset.json)",
+        default="data/test_subset.json",
+        help="Path to test data JSON (default: data/test_subset.json)",
     )
     eval_parser.add_argument(
         "--num-samples",
@@ -81,12 +81,6 @@ def main():
         type=int,
         default=5,
         help="Number of samples to evaluate (default: 5)",
-    )
-    eval_parser.add_argument(
-        "--temperature",
-        type=float,
-        default=0.1,
-        help="Generation temperature (default: 0.1)",
     )
 
     # -------------------------------------------------------------------------
@@ -118,9 +112,17 @@ def main():
         "--output", "-o", type=str, default="data", help="Output directory"
     )
     data_parser.add_argument(
-        "--train-size", type=int, default=4000, help="Training samples"
+        "--train-size", type=int, default=5000, help="Training samples"
     )
-    data_parser.add_argument("--test-size", type=int, default=1000, help="Test samples")
+    data_parser.add_argument(
+        "--val-size", type=int, default=500, help="Validation samples count"
+    )
+    data_parser.add_argument("--test-size", type=int, default=5000, help="Test samples")
+    data_parser.add_argument(
+        "--mix-duorc", 
+        action="store_true", 
+        help="Augment SQuAD training data with DuoRC dataset"
+    )
 
     # -------------------------------------------------------------------------
     # Check CUDA
@@ -165,9 +167,9 @@ def main():
         run_evaluation(
             model,
             tokenizer,
+            checkpoint_path=args.checkpoint,
             num_samples=args.num_samples,
             data_path=args.data,
-            temperature=args.temperature,
         )
 
     elif args.command == "chat":
@@ -193,7 +195,9 @@ def main():
         prepare_dataset(
             output_dir=args.output,
             train_size=args.train_size,
+            val_size=args.val_size,
             test_size=args.test_size,
+            mix_duorc=args.mix_duorc,
         )
 
     elif args.command == "check-cuda":

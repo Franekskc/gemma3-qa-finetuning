@@ -4,6 +4,8 @@ Runs inference on test data and computes metrics.
 """
 
 import random
+import json
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -70,9 +72,9 @@ def load_model_for_eval(
 def run_evaluation(
     model,
     tokenizer,
+    checkpoint_path: str | None = None,
     num_samples: int = 5,
     data_path: str = "data/test_subset.json",
-    temperature: float = 0.1,
     max_new_tokens: int = 50,
 ):
     """
@@ -83,7 +85,6 @@ def run_evaluation(
         tokenizer: Loaded tokenizer.
         num_samples: Number of samples to evaluate.
         data_path: Optional path to test data JSON.
-        temperature: Generation temperature.
         max_new_tokens: Maximum new tokens to generate.
     """
     # Load dataset
@@ -93,7 +94,8 @@ def run_evaluation(
         dataset = load_dataset("squad", split="validation")
 
     # Select random samples
-    indices = random.sample(range(len(dataset)), min(num_samples, len(dataset)))
+    real_num_samples = min(num_samples, len(dataset))
+    indices = random.sample(range(len(dataset)), real_num_samples)
     examples: Dataset = dataset.select(indices)
 
     print("=" * 60 + "\n")
@@ -108,7 +110,7 @@ def run_evaluation(
     all_f1_scores = []
 
     for i, example in enumerate(
-        tqdm(examples, desc=f"Evaluating on {len(examples)} samples...", unit="sample")
+        tqdm(examples, desc=f"Evaluating on {real_num_samples} samples...", unit="sample")
     ):
         context = example["context"]
         question = example["question"]
@@ -127,9 +129,7 @@ def run_evaluation(
             outputs = model.generate(
                 input_ids,
                 max_new_tokens=max_new_tokens,
-                do_sample=True,
-                temperature=temperature,
-                top_p=0.9,
+                do_sample=False,
                 eos_token_id=terminators,
             )
 
@@ -142,20 +142,37 @@ def run_evaluation(
         all_em_scores.append(em_score)
         all_f1_scores.append(f1_score)
 
-        # print(f"[{i+1}/{len(examples)}] Question: {question}")
-        # print(f"    Context: {context[:80]}...")
-        # print(f"    Ground Truth: {ground_truth_answers}")
-        # print(f"    Model Answer: {model_answer}")
-        # print(f"    EM: {em_score:.0f}  |  F1: {f1_score:.2f}")
-        # print("-" * 60)
-
     # Print aggregate scores
     avg_em = sum(all_em_scores) / len(all_em_scores) * 100
     avg_f1 = sum(all_f1_scores) / len(all_f1_scores) * 100
 
     print("\n" + "=" * 60)
-    print(f"AGGREGATE SCORES ({len(examples)} samples)")
+    print(f"AGGREGATE SCORES ({real_num_samples} samples)")
     print("=" * 60)
     print(f"  Exact Match:  {avg_em:.1f}%")
     print(f"  F1 Score:     {avg_f1:.1f}%")
     print("=" * 60)
+
+    # Save the results
+    if checkpoint_path:
+        output_dir = Path(checkpoint_path).parent
+        if output_dir.exists():
+            results_file = output_dir / "eval_results.json"
+            
+            results_data = {
+                "timestamp": datetime.now().isoformat(),
+                "num_samples": real_num_samples,
+                "exact_match": round(avg_em, 4),
+                "f1_score": round(avg_f1, 4),
+                "data_source": data_path
+            }
+
+            try:
+                with open(results_file, "w", encoding="utf-8") as f:
+                    json.dump(results_data, f, indent=4)
+                
+                logger.info(f"Results saved to: {results_file}")
+            except Exception as e:
+                logger.error(f"Failed to save results: {e}")
+        else:
+            logger.warning(f"Checkpoint directory {output_dir} does not exist. Skipping save.")

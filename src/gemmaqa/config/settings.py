@@ -44,14 +44,15 @@ class TrainingConfig:
     num_train_epochs: int
     learning_rate: float
     per_device_train_batch_size: int
-    effective_batch_size: int
+    gradient_accumulation_steps: int
     weight_decay: float
     warmup_ratio: float
     early_stopping_patience: int
+    eval_steps: int
+    save_steps: int
     logging_steps: int
     bf16: bool
     gradient_checkpointing: bool
-    gradient_accumulation_steps: int
     save_total_limit: int
 
 
