@@ -5,6 +5,7 @@ Model loading utilities for inference.
 import torch
 from transformers import AutoTokenizer
 from peft import PeftModel
+from pathlib import Path
 
 from gemmaqa.finetuning.base import load_base_model
 from gemmaqa.utils import get_logger
@@ -15,7 +16,6 @@ logger = get_logger(__name__)
 def load_model_for_inference(
     checkpoint_path: str | None = None,
     base_model_name: str = "google/gemma-3-1b-it",
-    is_lora: bool = True,
 ):
     """
     Load a model for inference.
@@ -31,11 +31,30 @@ def load_model_for_inference(
     logger.info("Loading model for inference", base_model=base_model_name)
     
     tokenizer = AutoTokenizer.from_pretrained(base_model_name)
-    model = load_base_model(base_model_name, quantize=True)
     
-    if checkpoint_path and is_lora:
-        logger.info("Loading LoRA adapter", path=checkpoint_path)
-        model = PeftModel.from_pretrained(model, checkpoint_path)
+    if checkpoint_path:
+        is_lora = (Path(checkpoint_path) / "adapter_config.json").exists()
+
+        if is_lora:
+            logger.info("Detected LoRA adapter structure.")
+
+            tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+            model = load_base_model(base_model_name, quantize=True)
+
+            logger.info("Loading LoRA weights...")
+            model = PeftModel.from_pretrained(model, checkpoint_path)
+        else:
+            logger.info("Detected Full/Freeze model structure.")
+
+            tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+            model = load_base_model(checkpoint_path, quantize=False)
+    else:
+        logger.info(
+            "No custom model configuration. Loading base model.",
+            base_model=base_model_name,
+        )
+        tokenizer = AutoTokenizer.from_pretrained(base_model_name)
+        model = load_base_model(base_model_name, quantize=True)
     
     model.eval()
     
