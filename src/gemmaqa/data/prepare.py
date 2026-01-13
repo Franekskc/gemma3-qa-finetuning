@@ -103,23 +103,6 @@ def prepare_dataset(
     random.shuffle(val_indices)
     test_subset = squad_val.select(val_indices[:test_size])
 
-    # 6. Corpus (unique contexts from TRAIN set)
-    logger.info("Building Corpus...")
-    unique_contexts = set()
-    corpus = []
-
-    for example in train_subset:
-        ctx = example["context"]
-        if ctx not in unique_contexts:
-            unique_contexts.add(ctx)
-            corpus.append(
-                {
-                    "id": example["id"],
-                    "title": example.get("title", "Unknown"),
-                    "text": ctx,
-                }
-            )
-
     logger.info(f"Final Train Subset size: {len(train_subset)}")
     logger.info(f"Final Validation Subset size: {len(val_subset)}")
     logger.info(f"Final Test Subset size: {len(test_subset)}")
@@ -130,7 +113,6 @@ def prepare_dataset(
     train_path = output_dir / "train_subset.json"
     val_path = output_dir / "val_subset.json"
     test_path = output_dir / "test_subset.json"
-    corpus_path = output_dir / "corpus.json"
 
     def save_json(data, path):
         with open(path, "w", encoding="utf-8") as f:
@@ -140,14 +122,10 @@ def prepare_dataset(
     save_json(val_subset, val_path)
     save_json(test_subset, test_path)
 
-    with open(corpus_path, "w", encoding="utf-8") as f:
-        json.dump(corpus, f, indent=2)
-
     logger.info("Done!")
 
     return {
         "train": str(train_path),
         "val": str(val_path),
         "test": str(test_path),
-        "corpus": str(corpus_path),
     }

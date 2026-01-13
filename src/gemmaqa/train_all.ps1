@@ -1,7 +1,3 @@
-# First prepare data and remember to set the exact same numbers in default.yaml 
-# The training should be performed on the whole prepared part of the dataset
-# Only then we can reliable compare the methods
-
 Write-Host "--- Starting Full Finetune ---"
 uv run gemmaqa train --mode full
 uv run gemmaqa eval --checkpoint outputs/full_finetune/final --num-samples 5000
