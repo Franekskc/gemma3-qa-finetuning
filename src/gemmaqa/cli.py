@@ -139,7 +139,7 @@ def main():
     rag_index_parser.add_argument(
         "--corpus", 
         type=str, 
-        default="data/corpus.json", 
+        default="data/train_subset.json", 
         help="Path to corpus JSON"
     )
     rag_index_parser.add_argument(
@@ -179,7 +179,7 @@ def main():
     rag_eval_parser.add_argument(
         "--corpus",
         type=str,
-        default="data/corpus.json",
+        default="data/train_subset.json",
         help="Path to corpus JSON",
     )
     rag_eval_parser.add_argument(

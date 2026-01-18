@@ -136,6 +136,7 @@ def run_evaluation(
                 model=model,
                 tokenizer=tokenizer,
                 question=question,
+                target_context=context,
                 retriever=retriever,
                 k=k,
                 max_new_tokens=max_new_tokens
@@ -143,7 +144,7 @@ def run_evaluation(
 
 
             # Optional: Print retrieved context titles for debugging
-            logger.debug(f"Retrieved: {[c['title'] for c in retrieved_ctxs]}")
+            logger.debug(f"Retrieved: {retrieved_ctxs}")
             logger.debug(f"Model answer: {model_answer}")
 
         else:

@@ -37,6 +37,50 @@ class GemmaQARetriever:
         self.index = None
         self.corpus = []
 
+    def _load_and_format_corpus(self, corpus_path: str | Path) -> list[dict]:
+        """
+        Load and format corpus. If items have 'context', 'question', 'answers',
+        format them into a single text block.
+        """
+        with open(corpus_path, "r", encoding="utf-8") as f:
+            raw_data = json.load(f)
+
+        formatted_corpus = []
+        for item in raw_data:
+            # Check if it's a SQuAD-style item
+            if "context" in item and "question" in item and "answers" in item:
+                # Extract first answer
+                answers = item["answers"]
+                if isinstance(answers, dict) and "text" in answers:
+                    first_answer = answers["text"][0] if answers["text"] else ""
+                elif isinstance(answers, list) and len(answers) > 0:
+                     # Fallback if answers is just a list of strings
+                    first_answer = answers[0]
+                else:
+                    first_answer = ""
+                
+                # Format:
+                # Context: ...
+                # Question: ...
+                # Answer: ...
+                text_block = (
+                    f"Context: {item['context']}\n"
+                    f"Question: {item['question']}\n"
+                    f"Answer: {first_answer}"
+                )
+                
+                # Create a new item ensuring 'text' is the formatted block
+                new_item = item.copy()
+                new_item["text"] = text_block
+                formatted_corpus.append(new_item)
+            
+            elif "text" in item:
+                formatted_corpus.append(item)
+            else:
+                logger.warning(f"Item missing required fields (context/question/answers OR text): {item.keys()}")
+        
+        return formatted_corpus
+
     def index_corpus(
         self,
         corpus_path: str | Path,
@@ -44,20 +88,19 @@ class GemmaQARetriever:
         batch_size: int = 64,
     ):
         """
-        Builds FAISS index from corpus.json and saves it.
+        Builds FAISS index from corpus JSON and saves it.
 
         Args:
-            corpus_path: Path to corpus.json (list of dicts with 'text' field).
-            output_dir: Directory to save index and corpus cache.
+            corpus_path: Path to dataset JSON (e.g. train_subset.json).
+            output_dir: Directory to save index.
             batch_size: Batch size for encoding.
         """
         corpus_path = Path(corpus_path)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading corpus from {corpus_path}...")
-        with open(corpus_path, "r", encoding="utf-8") as f:
-            self.corpus = json.load(f)
+        logger.info(f"Loading and formatting corpus from {corpus_path}...")
+        self.corpus = self._load_and_format_corpus(corpus_path)
 
         texts = [doc["text"] for doc in self.corpus]
         logger.info(f"Encoding {len(texts)} documents...")
@@ -87,14 +130,13 @@ class GemmaQARetriever:
 
         Args:
             index_path: Path to faiss_index.bin
-            corpus_path: Path to corpus.json
+            corpus_path: Path to dataset JSON (e.g. train_subset.json)
         """
         logger.info(f"Loading index from {index_path}...")
         self.index = faiss.read_index(str(index_path))
         
         logger.info(f"Loading corpus from {corpus_path}...")
-        with open(corpus_path, "r", encoding="utf-8") as f:
-            self.corpus = json.load(f)
+        self.corpus = self._load_and_format_corpus(corpus_path)
             
         if self.index.ntotal != len(self.corpus):
             logger.warning(
