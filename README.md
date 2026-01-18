@@ -1,6 +1,7 @@
 # Gemma 3 QA Fine-Tuning (SQuAD)
 
-Experiments comparing **Full FT**, **LoRA (PEFT)**, and **Layer Freezing** for **extractive QA** on **SQuAD 1.1** with **Gemma 3**. Designed for a single GPU (RTX 3070 Ti / GTX 1650, 8 GB).
+Experiments comparing **Full FT**, **LoRA (PEFT)**, and **Layer Freezing** for **extractive QA** on **SQuAD 1.1** with *
+*Gemma 3**. Designed for a single GPU (RTX 3070 Ti / GTX 1650, 8 GB).
 
 ## Project Structure
 
@@ -105,6 +106,9 @@ uv run gemmaqa rag-index --corpus data/corpus.json --output data
 # 2. Evaluate RAG
 # Compares retrieved context + Gemma 3 response against ground truth
 uv run gemmaqa rag-eval --num-samples 10 --top-k 3
+
+# 2b. Evaluate RAG with logs
+uv run gemmaqa --log-level DEBUG rag-eval --num-samples 50 --top-k 3
 ```
 
 ---
@@ -118,7 +122,7 @@ gemmaqa [--log-level <level>] <command> [options]
 ```
 
 | Command        | Description                 |
-| -------------- | --------------------------- |
+|----------------|-----------------------------|
 | `--log-level`  | Set logging level (DEBUG)   |
 | `train`        | Train/finetune a model      |
 | `eval`         | Evaluate a trained model    |
@@ -135,7 +139,7 @@ gemmaqa train --mode <mode> [--config <path>] [--train-data <path>] [--val-data 
 ```
 
 | Argument         | Required | Default                  | Description                 |
-| ---------------- | :------: | ------------------------ | --------------------------- |
+|------------------|:--------:|--------------------------|-----------------------------|
 | `--mode`, `-m`   |    ✓     | -                        | `full`, `lora`, or `freeze` |
 | `--config`, `-c` |          | `config/default.yaml`    | Path to config YAML         |
 | `--train-data`   |          | `data/train_subset.json` | Training data path          |
@@ -149,7 +153,7 @@ gemmaqa eval [--checkpoint <path>] [--base-model <name>] [--data <path>] [--num-
 ```
 
 | Argument              | Required | Default                 | Description                                                              |
-| --------------------- | :------: | ----------------------- | ------------------------------------------------------------------------ |
+|-----------------------|:--------:|-------------------------|--------------------------------------------------------------------------|
 | `--checkpoint`        |          | -                       | Path to model/adapter. If not provided, the base model will be evaluated |
 | `--base-model`        |          | `google/gemma-3-1b-it`  | Base model name                                                          |
 | `--data`              |          | `data/test-subset.json` | Testing data path                                                        |
@@ -162,7 +166,7 @@ gemmaqa chat [--checkpoint <path>] [--question <q>] [--context <c>] [--temperatu
 ```
 
 | Argument           | Required | Default                | Description                       |
-| ------------------ | :------: | ---------------------- | --------------------------------- |
+|--------------------|:--------:|------------------------|-----------------------------------|
 | `--checkpoint`     |          | -                      | Path to model/adapter             |
 | `--base-model`     |          | `google/gemma-3-1b-it` | Base model name                   |
 | `--question`, `-q` |          | -                      | Single question (non-interactive) |
@@ -177,7 +181,7 @@ gemmaqa prepare-data [--output <dir>] [--train-size <n>] [--val-size <n>] [--tes
 ```
 
 | Argument         | Required | Default | Description                          |
-| ---------------- | :------: | ------- | ------------------------------------ |
+|------------------|:--------:|---------|--------------------------------------|
 | `--output`, `-o` |          | `data`  | Output directory                     |
 | `--train-size`   |          | `5000`  | Training samples                     |
 | `--val-size`     |          | `500`   | Validation samples                   |
